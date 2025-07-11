@@ -208,7 +208,7 @@ function convertToFirestoreFormat(mongoDoc) {
 
 // CRUD ENDPOINTS (JWT required)
 
-// CREATE - POST document
+// CREATE - POST document (auto-generated ObjectId only)
 app.post(
   "/:projectName/:collectionName",
   checkConnection,
@@ -216,7 +216,12 @@ app.post(
   async (req, res) => {
     try {
       const { projectName, collectionName } = req.params;
-      const { documentId } = req.query;
+
+      console.log(`[CREATE] POST /${projectName}/${collectionName}`);
+      console.log(
+        `[CREATE] User: ${req.user.userId}, Project: ${req.user.projectName}`
+      );
+      console.log(`[CREATE] Body:`, req.body);
 
       // Use project name from JWT (already sanitized) for permission checks
       const userProjectName = req.user.projectName;
@@ -226,7 +231,11 @@ app.post(
       try {
         targetDbName = await resolveProjectDatabaseName(projectName);
       } catch (resolveError) {
-        return res.status(404).json({ error: resolveError.message });
+        console.error(`[CREATE] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: resolveError.message,
+          suggestion: `Make sure the project '${projectName}' exists and you have access to it.`,
+        });
       }
 
       // Validate creation permissions - prevents creating databases/collections outside user's project
@@ -238,19 +247,21 @@ app.post(
           collectionName
         );
       } catch (validationError) {
-        return res.status(403).json({ error: validationError.message });
+        console.error(
+          `[CREATE] Permission validation failed:`,
+          validationError
+        );
+        return res.status(403).json({
+          error: validationError.message,
+          suggestion: `You can only create documents in collections within your project '${userProjectName}'.`,
+        });
       }
 
       const { collection } = getDbAndCollection(targetDbName, collectionName);
       const document = convertFromFirestoreFormat(req.body);
 
-      let result;
-      if (documentId) {
-        document._id = documentId;
-        result = await collection.insertOne(document);
-      } else {
-        result = await collection.insertOne(document);
-      }
+      // Always use auto-generated ObjectId
+      const result = await collection.insertOne(document);
 
       // Initialize security rules if this is a new collection
       if (!validationResult.collectionExists) {
@@ -258,10 +269,18 @@ app.post(
       }
 
       const insertedDoc = await collection.findOne({ _id: result.insertedId });
+      console.log(
+        `[CREATE] Successfully created document with ID ${result.insertedId} in ${targetDbName}/${collectionName}`
+      );
       res.status(201).json(convertToFirestoreFormat(insertedDoc));
     } catch (error) {
-      console.error("Create error:", error);
-      res.status(500).json({ error: "Failed to create document" });
+      console.error(`[CREATE] Error creating document:`, error);
+
+      res.status(500).json({
+        error: "Failed to create document",
+        suggestion:
+          "Check your document structure and try again. Contact support if the problem persists.",
+      });
     }
   }
 );
@@ -275,12 +294,21 @@ app.get(
     try {
       const { projectName, collectionName, documentId } = req.params;
 
+      console.log(`[READ] GET /${projectName}/${collectionName}/${documentId}`);
+      console.log(
+        `[READ] User: ${req.user.userId}, Project: ${req.user.projectName}`
+      );
+
       // Resolve the requested project name to database name
       let targetDbName;
       try {
         targetDbName = await resolveProjectDatabaseName(projectName);
       } catch (resolveError) {
-        return res.status(404).json({ error: resolveError.message });
+        console.error(`[READ] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: resolveError.message,
+          suggestion: `Make sure the project '${projectName}' exists and you have access to it.`,
+        });
       }
 
       const { collection } = getDbAndCollection(targetDbName, collectionName);
@@ -290,13 +318,26 @@ app.get(
       });
 
       if (!document) {
-        return res.status(404).json({ error: "Document not found" });
+        console.log(
+          `[READ] Document not found: ${documentId} in ${targetDbName}/${collectionName}`
+        );
+        return res.status(404).json({
+          error: "Document not found",
+          suggestion: `Check that the document ID '${documentId}' exists in collection '${collectionName}'.`,
+        });
       }
 
+      console.log(
+        `[READ] Successfully retrieved document ${documentId} from ${targetDbName}/${collectionName}`
+      );
       res.json(convertToFirestoreFormat(document));
     } catch (error) {
-      console.error("Read error:", error);
-      res.status(500).json({ error: "Failed to read document" });
+      console.error(`[READ] Error reading document:`, error);
+      res.status(500).json({
+        error: "Failed to read document",
+        suggestion:
+          "Check your document ID format and try again. Contact support if the problem persists.",
+      });
     }
   }
 );
@@ -533,6 +574,96 @@ app.get("/health", (req, res) => {
     status: "ok",
     connected: isConnected,
     timestamp: new Date().toISOString(),
+  });
+});
+
+// 404 handler - must be after all other routes
+app.use((req, res) => {
+  console.log(`[404] ${req.method} ${req.path} - Route not found`);
+  console.log(`[404] Available routes for data operations:`);
+  console.log(
+    `  POST /${req.params.projectName || "[projectName]"}/${
+      req.params.collectionName || "[collectionName]"
+    } - Create document (auto-generated ID)`
+  );
+  console.log(
+    `  GET /${req.params.projectName || "[projectName]"}/${
+      req.params.collectionName || "[collectionName]"
+    } - Get all documents`
+  );
+  console.log(
+    `  GET /${req.params.projectName || "[projectName]"}/${
+      req.params.collectionName || "[collectionName]"
+    }/[documentId] - Get specific document`
+  );
+  console.log(
+    `  PATCH /${req.params.projectName || "[projectName]"}/${
+      req.params.collectionName || "[collectionName]"
+    }/[documentId] - Update document`
+  );
+  console.log(
+    `  DELETE /${req.params.projectName || "[projectName]"}/${
+      req.params.collectionName || "[collectionName]"
+    }/[documentId] - Delete document`
+  );
+
+  res.status(404).json({
+    error: "Route not found",
+    method: req.method,
+    path: req.path,
+    suggestion: getRouteSuggestion(req.method, req.path),
+    availableRoutes: {
+      create: "POST /:projectName/:collectionName (auto-generated ID)",
+      read: "GET /:projectName/:collectionName or GET /:projectName/:collectionName/:documentId",
+      update: "PATCH /:projectName/:collectionName/:documentId",
+      delete: "DELETE /:projectName/:collectionName/:documentId",
+      auth: "POST /requestCode, POST /verifyCode",
+      projects: "GET /projects, POST /projects",
+    },
+  });
+});
+
+// Helper function to provide route suggestions
+function getRouteSuggestion(method, path) {
+  const pathParts = path.split("/").filter((part) => part);
+
+  if (method === "POST" && pathParts.length === 3) {
+    return `Custom document IDs are not supported. To create a document in collection '${pathParts[1]}' of project '${pathParts[0]}' with auto-generated ID, use: POST /${pathParts[0]}/${pathParts[1]}`;
+  } else if (method === "POST" && pathParts.length === 2) {
+    return `To create a document in collection '${pathParts[1]}' of project '${pathParts[0]}' with auto-generated ID, use: POST /${pathParts[0]}/${pathParts[1]}`;
+  } else if (method === "GET" && pathParts.length === 3) {
+    return `To get document '${pathParts[2]}' from collection '${pathParts[1]}' of project '${pathParts[0]}', use: GET /${pathParts[0]}/${pathParts[1]}/${pathParts[2]}`;
+  } else if (method === "GET" && pathParts.length === 2) {
+    return `To get all documents from collection '${pathParts[1]}' of project '${pathParts[0]}', use: GET /${pathParts[0]}/${pathParts[1]}`;
+  }
+
+  return `Check the available routes listed above for the correct API endpoint format.`;
+}
+
+// Global error handler
+app.use((error, req, res, next) => {
+  console.error(`[ERROR] ${req.method} ${req.path}:`, error);
+
+  if (error.name === "ValidationError") {
+    return res.status(400).json({
+      error: "Validation failed",
+      details: error.message,
+      suggestion: "Check your request data format and required fields.",
+    });
+  }
+
+  if (error.name === "MongoError" || error.name === "MongoServerError") {
+    return res.status(500).json({
+      error: "Database error",
+      suggestion:
+        "There was an issue with the database operation. Please try again.",
+    });
+  }
+
+  res.status(500).json({
+    error: "Internal server error",
+    suggestion:
+      "An unexpected error occurred. Please try again or contact support.",
   });
 });
 
