@@ -1,3 +1,20 @@
+/**
+ * GET TOKEN SCRIPT
+ *
+ * Interactive script for generating JWT tokens for BaseBase API authentication.
+ * This script guides you through the phone verification process:
+ * 1. Requests a verification code for your phone number
+ * 2. Prompts you to enter the received code
+ * 3. Returns a JWT token that can be used for API authentication
+ *
+ * Usage: npm run get-token
+ *
+ * Requirements:
+ * - BaseBase server running on localhost:3000
+ * - Valid project API key
+ * - Phone number capable of receiving SMS
+ */
+
 const readline = require("readline");
 const https = require("https");
 const http = require("http");
@@ -72,6 +89,12 @@ async function main() {
       "http://localhost:3000";
 
     // Get project API key
+    console.log("💡 You need a project API key to authenticate.");
+    console.log(
+      "   Create a project first using the API or use an existing one."
+    );
+    console.log("   Default test API key: test-api-key-123\n");
+
     const projectApiKey = await prompt("Enter project API key: ");
     if (!projectApiKey) {
       console.error("❌ Project API key is required");

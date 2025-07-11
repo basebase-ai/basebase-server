@@ -53,7 +53,13 @@
    npm run get-token
    ```
 
-7. **Test the server:**
+7. **Create a new project (interactive):**
+
+   ```bash
+   npm run create-project
+   ```
+
+8. **Test the server:**
    ```bash
    curl http://localhost:3000/health
    ```
@@ -95,6 +101,42 @@ curl -X POST http://localhost:3000/verifyCode \
     "code": "123456",
     "projectApiKey": "your-project-api-key"
   }'
+```
+
+### Project Management (require JWT token)
+
+#### Create a project:
+
+```bash
+curl -X POST http://localhost:3000/projects \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "name": "My New Project",
+    "description": "Project description"
+  }'
+```
+
+**Note:** Project names are automatically sanitized:
+
+- "My New Project" becomes "my_new_project" (database name)
+- Display name preserves original formatting: "My New Project"
+- Special characters are replaced with underscores in database name
+- Database names are made unique with numbering if needed
+- JWT tokens include the database name for fast database access
+
+#### List your projects:
+
+```bash
+curl http://localhost:3000/projects \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+#### Regenerate API key:
+
+```bash
+curl -X POST http://localhost:3000/projects/PROJECT_ID/regenerate-key \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 ### CRUD Operations (require JWT token)
@@ -154,6 +196,12 @@ curl http://localhost:3000/myProject/users \
 - `POST /requestCode` - Request verification code
 - `POST /verifyCode` - Verify code and get JWT token
 
+### Project Management Endpoints (JWT required):
+
+- `POST /projects` - Create a new project
+- `GET /projects` - List your projects
+- `POST /projects/:projectId/regenerate-key` - Regenerate API key
+
 ### CRUD Endpoints (JWT required):
 
 - `POST /projectName/collectionName` - Create document
@@ -164,8 +212,9 @@ curl http://localhost:3000/myProject/users \
 
 Where:
 
-- `projectName` maps to MongoDB database name
+- `projectName` can be either the original project name or sanitized database name
 - `collectionName` maps to MongoDB collection name
+- The system automatically resolves project names to their sanitized database names
 
 ### Internal Collections:
 

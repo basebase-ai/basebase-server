@@ -42,6 +42,22 @@ function getDbAndCollection(projectName, collectionName) {
   return { db, collection };
 }
 
+// Helper function to resolve project name to database name
+async function resolveProjectDatabaseName(projectName) {
+  const projectsCollection = mongoClient.db("basebase").collection("projects");
+
+  // First try to find by database name (exact match)
+  let project = await projectsCollection.findOne({
+    name: projectName,
+  });
+
+  if (!project) {
+    throw new Error(`Project '${projectName}' not found`);
+  }
+
+  return project.name;
+}
+
 // Helper function to check if database/collection exists
 async function checkDbCollectionExists(projectName, collectionName) {
   const adminDb = mongoClient.db().admin();
@@ -59,6 +75,80 @@ async function checkDbCollectionExists(projectName, collectionName) {
   const collectionExists = collections.length > 0;
 
   return { dbExists, collectionExists };
+}
+
+// Helper function to validate creation permissions
+async function validateCreationPermissions(
+  requestedProjectName,
+  userProjectName,
+  collectionName
+) {
+  const { dbExists, collectionExists } = await checkDbCollectionExists(
+    requestedProjectName,
+    collectionName
+  );
+
+  // If database doesn't exist, only allow creation if it matches user's project
+  if (!dbExists && requestedProjectName !== userProjectName) {
+    throw new Error(
+      `Cannot create database '${requestedProjectName}' - only databases matching your project name '${userProjectName}' can be created`
+    );
+  }
+
+  // If database exists but collection doesn't, only allow creation in user's project database
+  if (
+    dbExists &&
+    !collectionExists &&
+    requestedProjectName !== userProjectName
+  ) {
+    throw new Error(
+      `Cannot create collection '${collectionName}' in database '${requestedProjectName}' - collections can only be created in your project database '${userProjectName}'`
+    );
+  }
+
+  return { dbExists, collectionExists };
+}
+
+// Helper function to initialize security rules for a new collection
+async function initializeSecurityRules(projectName, collectionName) {
+  try {
+    const securityRulesCollection = mongoClient
+      .db("basebase")
+      .collection("security_rules");
+
+    // Check if rules already exist for this collection
+    const existingRules = await securityRulesCollection.findOne({
+      projectName: projectName,
+      collectionName: collectionName,
+    });
+
+    if (existingRules) {
+      console.log(
+        `Security rules already exist for ${projectName}/${collectionName}`
+      );
+      return;
+    }
+
+    // Create default security rules document
+    const defaultRules = {
+      projectName: projectName,
+      collectionName: collectionName,
+      rules: [], // Empty rules array allows all operations for now
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await securityRulesCollection.insertOne(defaultRules);
+    console.log(
+      `Created default security rules for ${projectName}/${collectionName}`
+    );
+  } catch (error) {
+    console.error(
+      `Failed to initialize security rules for ${projectName}/${collectionName}:`,
+      error
+    );
+    // Don't throw error - security rules initialization shouldn't block collection creation
+  }
 }
 
 // Helper function to convert Firestore-style document to MongoDB format
@@ -128,22 +218,30 @@ app.post(
       const { projectName, collectionName } = req.params;
       const { documentId } = req.query;
 
-      // Check if database/collection exists before creating
-      const { dbExists, collectionExists } = await checkDbCollectionExists(
-        projectName,
-        collectionName
-      );
+      // Use project name from JWT (already sanitized) for permission checks
+      const userProjectName = req.user.projectName;
 
-      if (!dbExists) {
-        console.log(`Creating new database: ${projectName}`);
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
       }
-      if (!collectionExists) {
-        console.log(
-          `Creating new collection: ${collectionName} in database: ${projectName}`
+
+      // Validate creation permissions - prevents creating databases/collections outside user's project
+      let validationResult;
+      try {
+        validationResult = await validateCreationPermissions(
+          targetDbName,
+          userProjectName,
+          collectionName
         );
+      } catch (validationError) {
+        return res.status(403).json({ error: validationError.message });
       }
 
-      const { collection } = getDbAndCollection(projectName, collectionName);
+      const { collection } = getDbAndCollection(targetDbName, collectionName);
       const document = convertFromFirestoreFormat(req.body);
 
       let result;
@@ -152,6 +250,11 @@ app.post(
         result = await collection.insertOne(document);
       } else {
         result = await collection.insertOne(document);
+      }
+
+      // Initialize security rules if this is a new collection
+      if (!validationResult.collectionExists) {
+        await initializeSecurityRules(targetDbName, collectionName);
       }
 
       const insertedDoc = await collection.findOne({ _id: result.insertedId });
@@ -171,7 +274,16 @@ app.get(
   async (req, res) => {
     try {
       const { projectName, collectionName, documentId } = req.params;
-      const { collection } = getDbAndCollection(projectName, collectionName);
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
+      }
+
+      const { collection } = getDbAndCollection(targetDbName, collectionName);
 
       const document = await collection.findOne({
         _id: new ObjectId(documentId),
@@ -197,7 +309,16 @@ app.get(
   async (req, res) => {
     try {
       const { projectName, collectionName } = req.params;
-      const { collection } = getDbAndCollection(projectName, collectionName);
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
+      }
+
+      const { collection } = getDbAndCollection(targetDbName, collectionName);
 
       const documents = await collection.find({}).toArray();
 
@@ -223,7 +344,16 @@ app.patch(
   async (req, res) => {
     try {
       const { projectName, collectionName, documentId } = req.params;
-      const { collection } = getDbAndCollection(projectName, collectionName);
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
+      }
+
+      const { collection } = getDbAndCollection(targetDbName, collectionName);
 
       const updateData = convertFromFirestoreFormat(req.body);
 
@@ -255,7 +385,16 @@ app.delete(
   async (req, res) => {
     try {
       const { projectName, collectionName, documentId } = req.params;
-      const { collection } = getDbAndCollection(projectName, collectionName);
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
+      }
+
+      const { collection } = getDbAndCollection(targetDbName, collectionName);
 
       const result = await collection.deleteOne({
         _id: new ObjectId(documentId),
@@ -269,6 +408,121 @@ app.delete(
     } catch (error) {
       console.error("Delete error:", error);
       res.status(500).json({ error: "Failed to delete document" });
+    }
+  }
+);
+
+// SECURITY RULES MANAGEMENT ENDPOINTS
+
+// GET security rules for a collection
+app.get(
+  "/:projectName/:collectionName/_security",
+  checkConnection,
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { projectName, collectionName } = req.params;
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
+      }
+
+      const securityRulesCollection = mongoClient
+        .db("basebase")
+        .collection("security_rules");
+
+      const securityRules = await securityRulesCollection.findOne({
+        projectName: targetDbName,
+        collectionName: collectionName,
+      });
+
+      if (!securityRules) {
+        return res
+          .status(404)
+          .json({ error: "Security rules not found for this collection" });
+      }
+
+      res.json({
+        projectName: securityRules.projectName,
+        collectionName: securityRules.collectionName,
+        rules: securityRules.rules,
+        createdAt: securityRules.createdAt,
+        updatedAt: securityRules.updatedAt,
+      });
+    } catch (error) {
+      console.error("Get security rules error:", error);
+      res.status(500).json({ error: "Failed to retrieve security rules" });
+    }
+  }
+);
+
+// PUT security rules for a collection
+app.put(
+  "/:projectName/:collectionName/_security",
+  checkConnection,
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { projectName, collectionName } = req.params;
+      const { rules } = req.body;
+
+      if (!Array.isArray(rules)) {
+        return res.status(400).json({ error: "Rules must be an array" });
+      }
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
+      }
+
+      const securityRulesCollection = mongoClient
+        .db("basebase")
+        .collection("security_rules");
+
+      const result = await securityRulesCollection.updateOne(
+        {
+          projectName: targetDbName,
+          collectionName: collectionName,
+        },
+        {
+          $set: {
+            rules: rules,
+            updatedAt: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+
+      if (result.upsertedCount > 0) {
+        // If we created a new document, add the creation timestamp
+        await securityRulesCollection.updateOne(
+          { _id: result.upsertedId },
+          { $set: { createdAt: new Date() } }
+        );
+      }
+
+      const updatedRules = await securityRulesCollection.findOne({
+        projectName: targetDbName,
+        collectionName: collectionName,
+      });
+
+      res.json({
+        projectName: updatedRules.projectName,
+        collectionName: updatedRules.collectionName,
+        rules: updatedRules.rules,
+        createdAt: updatedRules.createdAt,
+        updatedAt: updatedRules.updatedAt,
+      });
+    } catch (error) {
+      console.error("Update security rules error:", error);
+      res.status(500).json({ error: "Failed to update security rules" });
     }
   }
 );
