@@ -197,10 +197,10 @@ async function sendSMS(phone, message) {
 // Request verification code endpoint
 async function requestCodeHandler(req, res, mongoClient) {
   try {
-    const { username, phone } = req.body;
+    const { name, phone } = req.body;
 
-    if (!username || !phone) {
-      return res.status(400).json({ error: "Username and phone are required" });
+    if (!name || !phone) {
+      return res.status(400).json({ error: "Name and phone are required" });
     }
 
     // Phone validation (basic)
@@ -210,7 +210,7 @@ async function requestCodeHandler(req, res, mongoClient) {
     }
 
     // Create or get user
-    const user = await getOrCreateUser(mongoClient, username, phone);
+    const user = await getOrCreateUser(mongoClient, name, phone);
 
     // Generate verification code
     const code = generateVerificationCode();
