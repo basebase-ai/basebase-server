@@ -11,6 +11,58 @@ Users authenticate via SMS phone verification and receive JWT tokens scoped to s
 
 JWT tokens contain the database name (project.name) for fast database operations without lookup overhead.
 
+### Getting a JWT Token
+
+To authenticate and get a JWT token, follow these steps:
+
+#### Step 1: Request Verification Code
+
+```
+POST http://localhost:3000/requestCode
+
+Body: {
+  "username": "your_username",
+  "phone": "+1234567890"
+}
+```
+
+This will send an SMS verification code to the provided phone number and create a user account if it doesn't exist.
+
+#### Step 2: Verify Code and Get JWT
+
+```
+POST http://localhost:3000/verifyCode
+
+Body: {
+  "phone": "+1234567890",
+  "code": "123456",
+  "projectApiKey": "bb_your_project_api_key_here"
+}
+```
+
+**Response:**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "user_id",
+    "username": "your_username",
+    "phone": "+1234567890"
+  }
+}
+```
+
+#### Step 3: Use JWT Token
+
+Include the JWT token in the Authorization header for all API requests:
+
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Note:** You need a valid project API key to complete authentication. See the Project Management section below for creating projects.
+
 ### Project Name Rules
 
 Project names are automatically sanitized to ensure MongoDB database compatibility:
