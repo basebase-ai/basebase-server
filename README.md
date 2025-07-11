@@ -7,7 +7,7 @@ Each Collection is owned by a Project, which defines the read/write access rules
 
 ## Authentication & Projects
 
-Users authenticate via phone verification and receive JWT tokens scoped to specific projects. Each project has a unique API key that must be securely stored and cannot be retrieved after creation.
+Users authenticate via SMS phone verification and receive JWT tokens scoped to specific projects. Verification codes are sent via Twilio SMS to the provided phone number. Each project has a unique API key that must be securely stored and cannot be retrieved after creation.
 
 JWT tokens contain the database name (project.name) for fast database operations without lookup overhead.
 

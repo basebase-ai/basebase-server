@@ -1,5 +1,12 @@
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const twilio = require("twilio");
+
+// Initialize Twilio client
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -168,6 +175,25 @@ async function verifyProjectApiKey(mongoClient, projectApiKey) {
   return project;
 }
 
+// Helper function to send SMS via Twilio
+async function sendSMS(phone, message) {
+  try {
+    const result = await twilioClient.messages.create({
+      body: message,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phone,
+    });
+
+    console.log(
+      `SMS sent successfully to ${phone}. Message SID: ${result.sid}`
+    );
+    return { success: true, messageId: result.sid };
+  } catch (error) {
+    console.error("Twilio SMS error:", error);
+    throw new Error(`Failed to send SMS: ${error.message}`);
+  }
+}
+
 // Request verification code endpoint
 async function requestCodeHandler(req, res, mongoClient) {
   try {
@@ -192,16 +218,29 @@ async function requestCodeHandler(req, res, mongoClient) {
     // Store code
     await storeVerificationCode(mongoClient, phone, code);
 
-    // In production, you would send this code via SMS
-    // For development, we'll return it (remove this in production!)
-    console.log(`Verification code for ${phone}: ${code}`);
+    // Send SMS with verification code
+    const message = `Your BaseBase verification code is: ${code}. This code expires in 5 minutes.`;
 
-    res.json({
-      message: "Verification code sent",
-      userId: user._id.toString(),
-      // Remove in production:
-      code: code,
-    });
+    try {
+      await sendSMS(phone, message);
+
+      res.json({
+        message: "Verification code sent via SMS",
+        userId: user._id.toString(),
+      });
+    } catch (smsError) {
+      console.error("SMS sending failed:", smsError);
+
+      // For development - fallback to console log if SMS fails
+      console.log(`Verification code for ${phone}: ${code}`);
+
+      res.status(500).json({
+        error:
+          "Failed to send SMS. Please check your phone number and try again.",
+        // Include code only in development for debugging
+        ...(process.env.NODE_ENV === "development" && { code: code }),
+      });
+    }
   } catch (error) {
     console.error("Request code error:", error);
     res.status(500).json({ error: "Failed to request verification code" });
@@ -248,7 +287,6 @@ async function verifyCodeHandler(req, res, mongoClient) {
         userId: user._id.toString(),
         projectId: project._id.toString(),
         projectName: project.name,
-        phone: user.phone,
       },
       JWT_SECRET,
       { expiresIn: "24h" }

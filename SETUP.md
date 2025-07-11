@@ -20,6 +20,11 @@
    MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/
    PORT=3000
    JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
+   # Twilio SMS Configuration
+   TWILIO_ACCOUNT_SID=your_twilio_account_sid
+   TWILIO_AUTH_TOKEN=your_twilio_auth_token
+   TWILIO_PHONE_NUMBER=your_twilio_phone_number
    ```
 
 3. **Configure MongoDB Atlas:**
@@ -29,7 +34,17 @@
    - Whitelist your IP address
    - Copy the connection string to your `.env` file
 
-4. **Start the server:**
+4. **Configure Twilio SMS (for phone verification):**
+
+   - Sign up for a Twilio account at https://www.twilio.com
+   - Get your Account SID and Auth Token from the Twilio Console
+   - Purchase a phone number or use a trial number
+   - Add the credentials to your `.env` file:
+     - `TWILIO_ACCOUNT_SID` - Your Twilio Account SID
+     - `TWILIO_AUTH_TOKEN` - Your Twilio Auth Token
+     - `TWILIO_PHONE_NUMBER` - Your Twilio phone number (format: +1234567890)
+
+5. **Start the server:**
 
    ```bash
    npm start
@@ -41,25 +56,25 @@
    npm run dev
    ```
 
-5. **Set up test project:**
+6. **Set up test project:**
 
    ```bash
    npm run setup
    ```
 
-6. **Get JWT token (interactive):**
+7. **Get JWT token (interactive):**
 
    ```bash
    npm run get-token
    ```
 
-7. **Create a new project (interactive):**
+8. **Create a new project (interactive):**
 
    ```bash
    npm run create-project
    ```
 
-8. **Test the server:**
+9. **Test the server:**
    ```bash
    curl http://localhost:3000/health
    ```
@@ -78,6 +93,17 @@ curl -X POST http://localhost:3000/requestCode \
     "phone": "+1234567890"
   }'
 ```
+
+Response:
+
+```json
+{
+  "message": "Verification code sent via SMS",
+  "userId": "user_id_here"
+}
+```
+
+**Note:** The verification code is sent via SMS to the provided phone number. In development mode, if SMS fails, the code may be logged to the console as fallback.
 
 #### 2. Create a project (manual setup in MongoDB):
 

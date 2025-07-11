@@ -12,11 +12,12 @@
     "manage-security-rules": "node scripts/manage-security-rules.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "mongodb": "^6.3.0",
-    "dotenv": "^16.3.1",
     "cors": "^2.8.5",
-    "jsonwebtoken": "^9.0.2"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.3.0",
+    "twilio": "^5.7.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
