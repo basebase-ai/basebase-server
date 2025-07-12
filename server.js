@@ -42,6 +42,11 @@ function getDbAndCollection(projectName, collectionName) {
   return { db, collection };
 }
 
+// Helper function to validate MongoDB ObjectId format
+function isValidObjectId(id) {
+  return /^[0-9a-fA-F]{24}$/.test(id);
+}
+
 // Helper function to resolve project name to database name
 async function resolveProjectDatabaseName(projectName) {
   const projectsCollection = mongoClient.db("basebase").collection("projects");
@@ -418,6 +423,104 @@ app.patch(
   }
 );
 
+// SET - PUT document (create or replace with specific ID)
+app.put(
+  "/:projectName/:collectionName/:documentId",
+  checkConnection,
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { projectName, collectionName, documentId } = req.params;
+
+      console.log(`[SET] PUT /${projectName}/${collectionName}/${documentId}`);
+      console.log(
+        `[SET] User: ${req.user.userId}, Project: ${req.user.projectName}`
+      );
+      console.log(`[SET] Body:`, req.body);
+
+      // Validate ObjectId format
+      if (!isValidObjectId(documentId)) {
+        console.error(`[SET] Invalid ObjectId format: ${documentId}`);
+        return res.status(400).json({
+          error: "Invalid document ID format",
+          suggestion:
+            "Document ID must be a 24-character hexadecimal string (MongoDB ObjectId format)",
+        });
+      }
+
+      // Use project name from JWT (already sanitized) for permission checks
+      const userProjectName = req.user.projectName;
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        console.error(`[SET] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: resolveError.message,
+          suggestion: `Make sure the project '${projectName}' exists and you have access to it.`,
+        });
+      }
+
+      // Validate creation permissions - prevents creating databases/collections outside user's project
+      let validationResult;
+      try {
+        validationResult = await validateCreationPermissions(
+          targetDbName,
+          userProjectName,
+          collectionName
+        );
+      } catch (validationError) {
+        console.error(`[SET] Permission validation failed:`, validationError);
+        return res.status(403).json({
+          error: validationError.message,
+          suggestion: `You can only create documents in collections within your project '${userProjectName}'.`,
+        });
+      }
+
+      const { collection } = getDbAndCollection(targetDbName, collectionName);
+      const document = convertFromFirestoreFormat(req.body);
+
+      // Use replaceOne with upsert to implement set behavior
+      const result = await collection.replaceOne(
+        { _id: new ObjectId(documentId) },
+        document,
+        { upsert: true }
+      );
+
+      // Initialize security rules if this is a new collection
+      if (!validationResult.collectionExists) {
+        await initializeSecurityRules(targetDbName, collectionName);
+      }
+
+      const setDoc = await collection.findOne({
+        _id: new ObjectId(documentId),
+      });
+
+      if (result.upsertedCount > 0) {
+        console.log(
+          `[SET] Successfully created document with ID ${documentId} in ${targetDbName}/${collectionName}`
+        );
+      } else {
+        console.log(
+          `[SET] Successfully replaced document with ID ${documentId} in ${targetDbName}/${collectionName}`
+        );
+      }
+
+      res.status(200).json(convertToFirestoreFormat(setDoc));
+    } catch (error) {
+      console.error(`[SET] Error setting document:`, error);
+
+      res.status(500).json({
+        error: "Failed to set document",
+        suggestion:
+          "Check your document structure and ID format. Contact support if the problem persists.",
+      });
+    }
+  }
+);
+
 // DELETE - DELETE document
 app.delete(
   "/:projectName/:collectionName/:documentId",
@@ -589,6 +692,8 @@ function getRouteSuggestion(method, path) {
     return `To get document '${pathParts[2]}' from collection '${pathParts[1]}' of project '${pathParts[0]}', use: GET /${pathParts[0]}/${pathParts[1]}/${pathParts[2]}`;
   } else if (method === "GET" && pathParts.length === 2) {
     return `To get all documents from collection '${pathParts[1]}' of project '${pathParts[0]}', use: GET /${pathParts[0]}/${pathParts[1]}`;
+  } else if (method === "PUT" && pathParts.length === 3) {
+    return `To set (create or replace) document '${pathParts[2]}' in collection '${pathParts[1]}' of project '${pathParts[0]}', use: PUT /${pathParts[0]}/${pathParts[1]}/${pathParts[2]} (ID must be 24-character hex)`;
   }
 
   return `Check the available routes listed above for the correct API endpoint format.`;
@@ -626,6 +731,11 @@ async function startServer() {
       }/[documentId] - Update document`
     );
     console.log(
+      `  PUT /${req.params.projectName || "[projectName]"}/${
+        req.params.collectionName || "[collectionName]"
+      }/[documentId] - Set document (create or replace)`
+    );
+    console.log(
       `  DELETE /${req.params.projectName || "[projectName]"}/${
         req.params.collectionName || "[collectionName]"
       }/[documentId] - Delete document`
@@ -640,6 +750,7 @@ async function startServer() {
         create: "POST /:projectName/:collectionName (auto-generated ID)",
         read: "GET /:projectName/:collectionName or GET /:projectName/:collectionName/:documentId",
         update: "PATCH /:projectName/:collectionName/:documentId",
+        set: "PUT /:projectName/:collectionName/:documentId (create or replace with specific ID)",
         delete: "DELETE /:projectName/:collectionName/:documentId",
         auth: "POST /requestCode, POST /verifyCode",
         projects: "GET /projects, POST /projects",
