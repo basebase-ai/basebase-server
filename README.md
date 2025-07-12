@@ -90,11 +90,7 @@ Body: {
 }
 ```
 
-Add document with specific ID:
-
-```
-POST http://localhost:3000/PROJECT_NAME/COLLECTION_NAME?documentId=DOCUMENT_ID
-```
+**Note:** POST only supports auto-generated MongoDB ObjectIds. To create or replace a document with a specific ID, use the PUT endpoint instead.
 
 ### READ - GET
 
@@ -123,6 +119,23 @@ Body: {
   }
 }
 ```
+
+### SET - PUT
+
+Create or replace document with specific ID:
+
+```
+PUT http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/DOCUMENT_ID
+
+Body: {
+  "fields": {
+    "name": {"stringValue": "John Doe"},
+    "age": {"integerValue": "30"}
+  }
+}
+```
+
+**Note:** `DOCUMENT_ID` must be a valid 24-character hexadecimal MongoDB ObjectId (e.g., `507f1f77bcf86cd799439011`). This endpoint implements "set" behavior - it will create the document if it doesn't exist, or completely replace it if it does exist.
 
 ### DELETE - DELETE
 
