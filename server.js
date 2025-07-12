@@ -577,52 +577,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// 404 handler - must be after all other routes
-app.use((req, res) => {
-  console.log(`[404] ${req.method} ${req.path} - Route not found`);
-  console.log(`[404] Available routes for data operations:`);
-  console.log(
-    `  POST /${req.params.projectName || "[projectName]"}/${
-      req.params.collectionName || "[collectionName]"
-    } - Create document (auto-generated ID)`
-  );
-  console.log(
-    `  GET /${req.params.projectName || "[projectName]"}/${
-      req.params.collectionName || "[collectionName]"
-    } - Get all documents`
-  );
-  console.log(
-    `  GET /${req.params.projectName || "[projectName]"}/${
-      req.params.collectionName || "[collectionName]"
-    }/[documentId] - Get specific document`
-  );
-  console.log(
-    `  PATCH /${req.params.projectName || "[projectName]"}/${
-      req.params.collectionName || "[collectionName]"
-    }/[documentId] - Update document`
-  );
-  console.log(
-    `  DELETE /${req.params.projectName || "[projectName]"}/${
-      req.params.collectionName || "[collectionName]"
-    }/[documentId] - Delete document`
-  );
-
-  res.status(404).json({
-    error: "Route not found",
-    method: req.method,
-    path: req.path,
-    suggestion: getRouteSuggestion(req.method, req.path),
-    availableRoutes: {
-      create: "POST /:projectName/:collectionName (auto-generated ID)",
-      read: "GET /:projectName/:collectionName or GET /:projectName/:collectionName/:documentId",
-      update: "PATCH /:projectName/:collectionName/:documentId",
-      delete: "DELETE /:projectName/:collectionName/:documentId",
-      auth: "POST /requestCode, POST /verifyCode",
-      projects: "GET /projects, POST /projects",
-    },
-  });
-});
-
 // Helper function to provide route suggestions
 function getRouteSuggestion(method, path) {
   const pathParts = path.split("/").filter((part) => part);
@@ -640,39 +594,85 @@ function getRouteSuggestion(method, path) {
   return `Check the available routes listed above for the correct API endpoint format.`;
 }
 
-// Global error handler
-app.use((error, req, res, next) => {
-  console.error(`[ERROR] ${req.method} ${req.path}:`, error);
-
-  if (error.name === "ValidationError") {
-    return res.status(400).json({
-      error: "Validation failed",
-      details: error.message,
-      suggestion: "Check your request data format and required fields.",
-    });
-  }
-
-  if (error.name === "MongoError" || error.name === "MongoServerError") {
-    return res.status(500).json({
-      error: "Database error",
-      suggestion:
-        "There was an issue with the database operation. Please try again.",
-    });
-  }
-
-  res.status(500).json({
-    error: "Internal server error",
-    suggestion:
-      "An unexpected error occurred. Please try again or contact support.",
-  });
-});
-
 // Start server
 async function startServer() {
   await connectToMongoDB();
 
   // Setup authentication routes after MongoDB connection
   setupAuthRoutes(app, mongoClient, checkConnection);
+
+  // 404 handler - must be after all other routes
+  app.use((req, res) => {
+    console.log(`[404] ${req.method} ${req.path} - Route not found`);
+    console.log(`[404] Available routes for data operations:`);
+    console.log(
+      `  POST /${req.params.projectName || "[projectName]"}/${
+        req.params.collectionName || "[collectionName]"
+      } - Create document (auto-generated ID)`
+    );
+    console.log(
+      `  GET /${req.params.projectName || "[projectName]"}/${
+        req.params.collectionName || "[collectionName]"
+      } - Get all documents`
+    );
+    console.log(
+      `  GET /${req.params.projectName || "[projectName]"}/${
+        req.params.collectionName || "[collectionName]"
+      }/[documentId] - Get specific document`
+    );
+    console.log(
+      `  PATCH /${req.params.projectName || "[projectName]"}/${
+        req.params.collectionName || "[collectionName]"
+      }/[documentId] - Update document`
+    );
+    console.log(
+      `  DELETE /${req.params.projectName || "[projectName]"}/${
+        req.params.collectionName || "[collectionName]"
+      }/[documentId] - Delete document`
+    );
+
+    res.status(404).json({
+      error: "Route not found",
+      method: req.method,
+      path: req.path,
+      suggestion: getRouteSuggestion(req.method, req.path),
+      availableRoutes: {
+        create: "POST /:projectName/:collectionName (auto-generated ID)",
+        read: "GET /:projectName/:collectionName or GET /:projectName/:collectionName/:documentId",
+        update: "PATCH /:projectName/:collectionName/:documentId",
+        delete: "DELETE /:projectName/:collectionName/:documentId",
+        auth: "POST /requestCode, POST /verifyCode",
+        projects: "GET /projects, POST /projects",
+      },
+    });
+  });
+
+  // Global error handler
+  app.use((error, req, res, next) => {
+    console.error(`[ERROR] ${req.method} ${req.path}:`, error);
+
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: error.message,
+        suggestion: "Check your request data format and required fields.",
+      });
+    }
+
+    if (error.name === "MongoError" || error.name === "MongoServerError") {
+      return res.status(500).json({
+        error: "Database error",
+        suggestion:
+          "There was an issue with the database operation. Please try again.",
+      });
+    }
+
+    res.status(500).json({
+      error: "Internal server error",
+      suggestion:
+        "An unexpected error occurred. Please try again or contact support.",
+    });
+  });
 
   app.listen(PORT, () => {
     console.log(`BaseBase Server running on port ${PORT}`);
