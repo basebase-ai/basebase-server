@@ -180,7 +180,7 @@ async function main() {
     console.log(tokenResponse.data.token);
     console.log("\n📋 Copy this token and use it in your API requests as:");
     console.log("Authorization: Bearer " + tokenResponse.data.token);
-    console.log("\n⏰ Token expires in 24 hours");
+    console.log("\n⏰ Token expires in 1 year");
   } catch (error) {
     console.error("❌ Error:", error.message);
     process.exit(1);

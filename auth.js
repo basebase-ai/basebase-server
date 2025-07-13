@@ -289,7 +289,7 @@ async function verifyCodeHandler(req, res, mongoClient) {
         projectName: project.name,
       },
       JWT_SECRET,
-      { expiresIn: "24h" }
+      { expiresIn: "1y" }
     );
 
     res.json({
