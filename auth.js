@@ -99,6 +99,13 @@ function authenticateToken(req, res, next) {
   });
 }
 
+// Helper function to validate phone number format
+function validatePhoneFormat(phone) {
+  // Enforce strict +1234567890 format: + followed by 10-15 digits only
+  const phoneRegex = /^\+\d{10,15}$/;
+  return phoneRegex.test(phone);
+}
+
 // Helper function to generate verification code
 function generateVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
@@ -203,10 +210,12 @@ async function requestCodeHandler(req, res, mongoClient) {
       return res.status(400).json({ error: "Name and phone are required" });
     }
 
-    // Phone validation (basic)
-    const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
-    if (!phoneRegex.test(phone)) {
-      return res.status(400).json({ error: "Invalid phone number format" });
+    // Phone validation - enforce strict +1234567890 format
+    if (!validatePhoneFormat(phone)) {
+      return res.status(400).json({
+        error:
+          "Invalid phone number format. Phone must be in format +1234567890 (+ followed by 10-15 digits only)",
+      });
     }
 
     // Create or get user
@@ -256,6 +265,14 @@ async function verifyCodeHandler(req, res, mongoClient) {
       return res
         .status(400)
         .json({ error: "Phone, code, and projectApiKey are required" });
+    }
+
+    // Phone validation - enforce strict +1234567890 format
+    if (!validatePhoneFormat(phone)) {
+      return res.status(400).json({
+        error:
+          "Invalid phone number format. Phone must be in format +1234567890 (+ followed by 10-15 digits only)",
+      });
     }
 
     // Verify the code
