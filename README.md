@@ -149,7 +149,7 @@ BaseBase automatically creates security rules for each collection using Firebase
 
 ### Security Rules Structure
 
-Each collection has security rules stored in the `security_rules` collection with the following structure:
+Each collection has metadata stored in the `collections` collection with the following structure:
 
 ```json
 {
@@ -162,14 +162,28 @@ Each collection has security rules stored in the `security_rules` collection wit
       "condition": "auth != null"
     }
   ],
+  "indexes": [
+    {
+      "fields": { "email": 1 },
+      "options": { "unique": true }
+    },
+    {
+      "fields": { "name": "text", "description": "text" },
+      "options": { "name": "text_search_index" }
+    },
+    {
+      "fields": { "tags": 1 },
+      "options": { "sparse": true }
+    }
+  ],
   "createdAt": "2024-01-01T00:00:00.000Z",
   "updatedAt": "2024-01-01T00:00:00.000Z"
 }
 ```
 
-### Managing Security Rules
+### Managing Collection Metadata
 
-#### Get Security Rules
+#### Get Collection Metadata (Security Rules & Indexes)
 
 ```
 GET http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/_security
@@ -193,13 +207,111 @@ Body: {
 }
 ```
 
+#### Update Indexes
+
+```
+PUT http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/_security
+Authorization: Bearer JWT_TOKEN
+
+Body: {
+  "indexes": [
+    {
+      "fields": { "email": 1 },
+      "options": { "unique": true }
+    },
+    {
+      "fields": { "name": "text", "description": "text" },
+      "options": { "name": "text_search_index" }
+    },
+    {
+      "fields": { "location": "2dsphere" },
+      "options": { "name": "geo_index" }
+    }
+  ]
+}
+```
+
+#### Update Both Rules and Indexes
+
+```
+PUT http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/_security
+Authorization: Bearer JWT_TOKEN
+
+Body: {
+  "rules": [
+    {
+      "match": "/documents/{document}",
+      "allow": ["read", "write"],
+      "condition": "auth != null"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": { "email": 1 },
+      "options": { "unique": true }
+    }
+  ]
+}
+```
+
+### Index Support
+
+BaseBase supports MongoDB-like indexes that can be defined for each collection. Supported index types and options include:
+
+#### Index Types
+
+- **Single field**: `{ "fieldName": 1 }` (ascending) or `{ "fieldName": -1 }` (descending)
+- **Compound**: `{ "field1": 1, "field2": -1 }`
+- **Text search**: `{ "field1": "text", "field2": "text" }`
+- **Geospatial (2dsphere)**: `{ "location": "2dsphere" }` (future support)
+
+#### Index Options
+
+- **unique**: `{ "unique": true }` - Ensures field values are unique
+- **sparse**: `{ "sparse": true }` - Only indexes documents that contain the indexed field
+- **name**: `{ "name": "custom_index_name" }` - Custom name for the index
+- **background**: `{ "background": true }` - Creates index in background (future support)
+
+#### Examples
+
+**Unique email index:**
+
+```json
+{
+  "fields": { "email": 1 },
+  "options": { "unique": true }
+}
+```
+
+**Text search index:**
+
+```json
+{
+  "fields": { "title": "text", "content": "text" },
+  "options": { "name": "search_index" }
+}
+```
+
+**Sparse compound index:**
+
+```json
+{
+  "fields": { "category": 1, "priority": -1 },
+  "options": { "sparse": true, "name": "category_priority" }
+}
+```
+
+**Note**: Indexes are currently stored as metadata but not yet automatically applied to the MongoDB collections. Index application will be implemented in a future update.
+
 ### Default Behavior
 
 - **Empty rules array**: Allows all operations by everyone
-- **Automatic initialization**: Rules are created when collections are first used
-- **Firebase syntax**: Compatible with Firebase Security Rules syntax for easy migration
+- **Empty indexes array**: No custom indexes are defined
+- **Automatic initialization**: Collection metadata (rules and indexes) is created when collections are first used
+- **Firebase syntax**: Security rules are compatible with Firebase Security Rules syntax for easy migration
+- **MongoDB indexes**: Index definitions follow MongoDB index syntax
 
-**Note**: Security rules are currently stored but not yet enforced. Rule enforcement will be implemented in a future update.
+**Note**: Security rules and indexes are currently stored as metadata but not yet enforced/applied. Rule enforcement and automatic index creation will be implemented in future updates.
 
 ## Project Management
 

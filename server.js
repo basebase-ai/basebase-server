@@ -114,46 +114,137 @@ async function validateCreationPermissions(
   return { dbExists, collectionExists };
 }
 
-// Helper function to initialize security rules for a new collection
-async function initializeSecurityRules(projectName, collectionName) {
+// Helper function to initialize collection metadata for a new collection
+async function initializeCollectionMetadata(projectName, collectionName) {
   try {
-    const securityRulesCollection = mongoClient
+    const collectionsCollection = mongoClient
       .db("basebase")
-      .collection("security_rules");
+      .collection("collections");
 
-    // Check if rules already exist for this collection
-    const existingRules = await securityRulesCollection.findOne({
+    // Check if metadata already exists for this collection
+    const existingMetadata = await collectionsCollection.findOne({
       projectName: projectName,
       collectionName: collectionName,
     });
 
-    if (existingRules) {
+    if (existingMetadata) {
       console.log(
-        `Security rules already exist for ${projectName}/${collectionName}`
+        `Collection metadata already exists for ${projectName}/${collectionName}`
       );
       return;
     }
 
-    // Create default security rules document
-    const defaultRules = {
+    // Create default collection metadata document
+    const defaultMetadata = {
       projectName: projectName,
       collectionName: collectionName,
       rules: [], // Empty rules array allows all operations for now
+      indexes: [], // Array for MongoDB-like indexes (unique, sparse, text, etc.)
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    await securityRulesCollection.insertOne(defaultRules);
+    await collectionsCollection.insertOne(defaultMetadata);
     console.log(
-      `Created default security rules for ${projectName}/${collectionName}`
+      `Created default collection metadata for ${projectName}/${collectionName}`
     );
   } catch (error) {
     console.error(
-      `Failed to initialize security rules for ${projectName}/${collectionName}:`,
+      `Failed to initialize collection metadata for ${projectName}/${collectionName}:`,
       error
     );
-    // Don't throw error - security rules initialization shouldn't block collection creation
+    // Don't throw error - collection metadata initialization shouldn't block collection creation
   }
+}
+
+// Helper function to apply indexes from metadata to actual MongoDB collection
+async function applyCollectionIndexes(projectName, collectionName) {
+  try {
+    console.log(
+      `[INDEX] Checking indexes for ${projectName}/${collectionName}`
+    );
+
+    // Get collection metadata
+    const collectionsCollection = mongoClient
+      .db("basebase")
+      .collection("collections");
+
+    const metadata = await collectionsCollection.findOne({
+      projectName: projectName,
+      collectionName: collectionName,
+    });
+
+    if (!metadata || !metadata.indexes || metadata.indexes.length === 0) {
+      console.log(
+        `[INDEX] No indexes defined for ${projectName}/${collectionName}`
+      );
+      return;
+    }
+
+    // Get the actual MongoDB collection
+    const { collection } = getDbAndCollection(projectName, collectionName);
+
+    // Get existing indexes
+    const existingIndexes = await collection.listIndexes().toArray();
+    const existingIndexNames = new Set(existingIndexes.map((idx) => idx.name));
+
+    console.log(
+      `[INDEX] Existing indexes: ${Array.from(existingIndexNames).join(", ")}`
+    );
+    console.log(
+      `[INDEX] Applying ${metadata.indexes.length} indexes from metadata`
+    );
+
+    // Apply each index from metadata
+    for (const indexDef of metadata.indexes) {
+      try {
+        const { fields, options = {} } = indexDef;
+
+        if (!fields || typeof fields !== "object") {
+          console.warn(
+            `[INDEX] Invalid index definition - missing or invalid fields:`,
+            indexDef
+          );
+          continue;
+        }
+
+        // Generate index name if not provided
+        const indexName = options.name || generateIndexName(fields);
+
+        // Skip if index already exists
+        if (existingIndexNames.has(indexName)) {
+          console.log(`[INDEX] Index '${indexName}' already exists, skipping`);
+          continue;
+        }
+
+        // Create the index
+        console.log(
+          `[INDEX] Creating index '${indexName}' with fields:`,
+          fields,
+          "options:",
+          options
+        );
+        await collection.createIndex(fields, { ...options, name: indexName });
+        console.log(`[INDEX] Successfully created index '${indexName}'`);
+      } catch (indexError) {
+        console.error(`[INDEX] Failed to create index:`, indexError.message);
+        // Continue with other indexes - don't let one failure stop the rest
+      }
+    }
+  } catch (error) {
+    console.error(
+      `[INDEX] Error applying indexes for ${projectName}/${collectionName}:`,
+      error.message
+    );
+    // Don't throw error - index application shouldn't block document operations
+  }
+}
+
+// Helper function to generate index name from fields
+function generateIndexName(fields) {
+  return Object.entries(fields)
+    .map(([field, direction]) => `${field}_${direction}`)
+    .join("_");
 }
 
 // Helper function to convert Firestore-style document to MongoDB format
@@ -268,10 +359,13 @@ app.post(
       // Always use auto-generated ObjectId
       const result = await collection.insertOne(document);
 
-      // Initialize security rules if this is a new collection
+      // Initialize collection metadata if this is a new collection
       if (!validationResult.collectionExists) {
-        await initializeSecurityRules(targetDbName, collectionName);
+        await initializeCollectionMetadata(targetDbName, collectionName);
       }
+
+      // Apply collection indexes after successful document creation
+      await applyCollectionIndexes(targetDbName, collectionName);
 
       const insertedDoc = await collection.findOne({ _id: result.insertedId });
       console.log(
@@ -286,6 +380,139 @@ app.post(
         suggestion:
           "Check your document structure and try again. Contact support if the problem persists.",
       });
+    }
+  }
+);
+
+// SECURITY RULES MANAGEMENT ENDPOINTS
+
+// GET security rules for a collection
+app.get(
+  "/:projectName/:collectionName/_security",
+  checkConnection,
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { projectName, collectionName } = req.params;
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
+      }
+
+      const collectionsCollection = mongoClient
+        .db("basebase")
+        .collection("collections");
+
+      const collectionMetadata = await collectionsCollection.findOne({
+        projectName: targetDbName,
+        collectionName: collectionName,
+      });
+
+      if (!collectionMetadata) {
+        return res
+          .status(404)
+          .json({ error: "Collection metadata not found for this collection" });
+      }
+
+      res.json({
+        projectName: collectionMetadata.projectName,
+        collectionName: collectionMetadata.collectionName,
+        rules: collectionMetadata.rules,
+        indexes: collectionMetadata.indexes || [],
+        createdAt: collectionMetadata.createdAt,
+        updatedAt: collectionMetadata.updatedAt,
+      });
+    } catch (error) {
+      console.error("Get collection metadata error:", error);
+      res.status(500).json({ error: "Failed to retrieve collection metadata" });
+    }
+  }
+);
+
+// PUT security rules for a collection
+app.put(
+  "/:projectName/:collectionName/_security",
+  checkConnection,
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { projectName, collectionName } = req.params;
+      const { rules, indexes } = req.body;
+
+      if (rules !== undefined && !Array.isArray(rules)) {
+        return res.status(400).json({ error: "Rules must be an array" });
+      }
+
+      if (indexes !== undefined && !Array.isArray(indexes)) {
+        return res.status(400).json({ error: "Indexes must be an array" });
+      }
+
+      // Resolve the requested project name to database name
+      let targetDbName;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectName);
+      } catch (resolveError) {
+        return res.status(404).json({ error: resolveError.message });
+      }
+
+      const collectionsCollection = mongoClient
+        .db("basebase")
+        .collection("collections");
+
+      // Build update object based on provided fields
+      const updateFields = { updatedAt: new Date() };
+      if (rules !== undefined) {
+        updateFields.rules = rules;
+      }
+      if (indexes !== undefined) {
+        updateFields.indexes = indexes;
+      }
+
+      const result = await collectionsCollection.updateOne(
+        {
+          projectName: targetDbName,
+          collectionName: collectionName,
+        },
+        {
+          $set: updateFields,
+        },
+        { upsert: true }
+      );
+
+      if (result.upsertedCount > 0) {
+        // If we created a new document, add the creation timestamp and default values
+        await collectionsCollection.updateOne(
+          { _id: result.upsertedId },
+          {
+            $set: {
+              createdAt: new Date(),
+              ...(rules === undefined && { rules: [] }),
+              ...(indexes === undefined && { indexes: [] }),
+            },
+          }
+        );
+      }
+
+      const updatedMetadata = await collectionsCollection.findOne({
+        projectName: targetDbName,
+        collectionName: collectionName,
+      });
+
+      res.json({
+        projectName: updatedMetadata.projectName,
+        collectionName: updatedMetadata.collectionName,
+        rules: updatedMetadata.rules,
+        indexes: updatedMetadata.indexes || [],
+        createdAt: updatedMetadata.createdAt,
+        updatedAt: updatedMetadata.updatedAt,
+      });
+    } catch (error) {
+      console.error("Update collection metadata error:", error);
+      res.status(500).json({ error: "Failed to update collection metadata" });
     }
   }
 );
@@ -412,6 +639,9 @@ app.patch(
         return res.status(404).json({ error: "Document not found" });
       }
 
+      // Apply collection indexes after successful document update
+      await applyCollectionIndexes(targetDbName, collectionName);
+
       const updatedDoc = await collection.findOne({
         _id: new ObjectId(documentId),
       });
@@ -489,10 +719,13 @@ app.put(
         { upsert: true }
       );
 
-      // Initialize security rules if this is a new collection
+      // Initialize collection metadata if this is a new collection
       if (!validationResult.collectionExists) {
-        await initializeSecurityRules(targetDbName, collectionName);
+        await initializeCollectionMetadata(targetDbName, collectionName);
       }
+
+      // Apply collection indexes after successful document operation
+      await applyCollectionIndexes(targetDbName, collectionName);
 
       const setDoc = await collection.findOne({
         _id: new ObjectId(documentId),
@@ -552,121 +785,6 @@ app.delete(
     } catch (error) {
       console.error("Delete error:", error);
       res.status(500).json({ error: "Failed to delete document" });
-    }
-  }
-);
-
-// SECURITY RULES MANAGEMENT ENDPOINTS
-
-// GET security rules for a collection
-app.get(
-  "/:projectName/:collectionName/_security",
-  checkConnection,
-  authenticateToken,
-  async (req, res) => {
-    try {
-      const { projectName, collectionName } = req.params;
-
-      // Resolve the requested project name to database name
-      let targetDbName;
-      try {
-        targetDbName = await resolveProjectDatabaseName(projectName);
-      } catch (resolveError) {
-        return res.status(404).json({ error: resolveError.message });
-      }
-
-      const securityRulesCollection = mongoClient
-        .db("basebase")
-        .collection("security_rules");
-
-      const securityRules = await securityRulesCollection.findOne({
-        projectName: targetDbName,
-        collectionName: collectionName,
-      });
-
-      if (!securityRules) {
-        return res
-          .status(404)
-          .json({ error: "Security rules not found for this collection" });
-      }
-
-      res.json({
-        projectName: securityRules.projectName,
-        collectionName: securityRules.collectionName,
-        rules: securityRules.rules,
-        createdAt: securityRules.createdAt,
-        updatedAt: securityRules.updatedAt,
-      });
-    } catch (error) {
-      console.error("Get security rules error:", error);
-      res.status(500).json({ error: "Failed to retrieve security rules" });
-    }
-  }
-);
-
-// PUT security rules for a collection
-app.put(
-  "/:projectName/:collectionName/_security",
-  checkConnection,
-  authenticateToken,
-  async (req, res) => {
-    try {
-      const { projectName, collectionName } = req.params;
-      const { rules } = req.body;
-
-      if (!Array.isArray(rules)) {
-        return res.status(400).json({ error: "Rules must be an array" });
-      }
-
-      // Resolve the requested project name to database name
-      let targetDbName;
-      try {
-        targetDbName = await resolveProjectDatabaseName(projectName);
-      } catch (resolveError) {
-        return res.status(404).json({ error: resolveError.message });
-      }
-
-      const securityRulesCollection = mongoClient
-        .db("basebase")
-        .collection("security_rules");
-
-      const result = await securityRulesCollection.updateOne(
-        {
-          projectName: targetDbName,
-          collectionName: collectionName,
-        },
-        {
-          $set: {
-            rules: rules,
-            updatedAt: new Date(),
-          },
-        },
-        { upsert: true }
-      );
-
-      if (result.upsertedCount > 0) {
-        // If we created a new document, add the creation timestamp
-        await securityRulesCollection.updateOne(
-          { _id: result.upsertedId },
-          { $set: { createdAt: new Date() } }
-        );
-      }
-
-      const updatedRules = await securityRulesCollection.findOne({
-        projectName: targetDbName,
-        collectionName: collectionName,
-      });
-
-      res.json({
-        projectName: updatedRules.projectName,
-        collectionName: updatedRules.collectionName,
-        rules: updatedRules.rules,
-        createdAt: updatedRules.createdAt,
-        updatedAt: updatedRules.updatedAt,
-      });
-    } catch (error) {
-      console.error("Update security rules error:", error);
-      res.status(500).json({ error: "Failed to update security rules" });
     }
   }
 );

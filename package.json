@@ -9,7 +9,8 @@
     "get-token": "node scripts/get-token.js",
     "create-project": "node scripts/create-project.js",
     "setup": "node scripts/setup.js",
-    "manage-security-rules": "node scripts/manage-security-rules.js"
+    "manage-security-rules": "node scripts/manage-security-rules.js",
+    "test-index-application": "node scripts/test-index-application.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
