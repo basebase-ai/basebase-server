@@ -46,9 +46,23 @@ Body: {
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "id": "user_id",
-    "username": "your_username",
-    "phone": "+1234567890"
+    "name": "users/user_name_id",
+    "fields": {
+      "name": { "stringValue": "your_username" },
+      "phone": { "stringValue": "+1234567890" },
+      "createdAt": { "timestampValue": "2024-01-01T00:00:00.000Z" },
+      "updatedAt": { "timestampValue": "2024-01-01T00:00:00.000Z" }
+    }
+  },
+  "project": {
+    "name": "projects/project_name_id",
+    "fields": {
+      "displayName": { "stringValue": "My Project" },
+      "description": { "stringValue": "Project description" },
+      "ownerId": { "stringValue": "user_name_id" },
+      "createdAt": { "timestampValue": "2024-01-01T00:00:00.000Z" },
+      "updatedAt": { "timestampValue": "2024-01-01T00:00:00.000Z" }
+    }
   }
 }
 ```
