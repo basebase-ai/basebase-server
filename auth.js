@@ -2,6 +2,14 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const twilio = require("twilio");
 
+// Helper function to generate 72-bit base64 _name ID (same as server.js)
+function generateName() {
+  // Generate 9 bytes (72 bits) of random data
+  const randomBytes = crypto.randomBytes(9);
+  // Convert to base64 and make URL-safe
+  return randomBytes.toString('base64url');
+}
+
 // Initialize Twilio client
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID,
@@ -63,7 +71,7 @@ async function ensureUniqueProjectName(mongoClient, baseName, userId) {
   while (true) {
     // Check if name exists for this user or globally (since it will be a DB name)
     const existingProject = await projectsCollection.findOne({
-      name: uniqueName,
+      _name: uniqueName,
     });
 
     if (!existingProject) {
@@ -115,12 +123,39 @@ function generateVerificationCode() {
 async function getOrCreateUser(mongoClient, name, phone) {
   const usersCollection = mongoClient.db("basebase").collection("users");
 
+  // Create unique index on _name if it doesn't exist
+  try {
+    await usersCollection.createIndex({ _name: 1 }, { unique: true });
+  } catch (indexError) {
+    // Index might already exist, that's fine
+    console.log("Users _name index creation info:", indexError.message);
+  }
+
   // Check if user already exists
   let user = await usersCollection.findOne({ phone });
 
   if (!user) {
+    // Generate unique _name for user
+    let userName;
+    const maxAttempts = 10;
+    
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      userName = generateName();
+      
+      // Check if _name already exists
+      const existingUser = await usersCollection.findOne({ _name: userName });
+      if (!existingUser) {
+        break;
+      }
+      
+      if (attempt === maxAttempts - 1) {
+        throw new Error("Failed to generate unique _name for user after multiple attempts");
+      }
+    }
+
     // Create new user
     const newUser = {
+      _name: userName,
       name,
       phone,
       createdAt: new Date(),
@@ -128,7 +163,7 @@ async function getOrCreateUser(mongoClient, name, phone) {
     };
 
     const result = await usersCollection.insertOne(newUser);
-    user = await usersCollection.findOne({ _id: result.insertedId });
+    user = await usersCollection.findOne({ _name: newUser._name });
   }
 
   return user;
@@ -301,9 +336,9 @@ async function verifyCodeHandler(req, res, mongoClient) {
     // Generate JWT token
     const token = jwt.sign(
       {
-        userId: user._id.toString(),
-        projectId: project._id.toString(),
-        projectName: project.name,
+        userId: user._name,
+        projectId: project._name,
+        projectName: project._name,
       },
       JWT_SECRET,
       { expiresIn: "1y" }
@@ -312,14 +347,23 @@ async function verifyCodeHandler(req, res, mongoClient) {
     res.json({
       token,
       user: {
-        id: user._id.toString(),
-        name: user.name,
-        phone: user.phone,
+        name: `users/${user._name}`,
+        fields: {
+          name: { stringValue: user.name },
+          phone: { stringValue: user.phone },
+          createdAt: { timestampValue: user.createdAt.toISOString() },
+          updatedAt: { timestampValue: user.updatedAt.toISOString() }
+        }
       },
       project: {
-        id: project._id.toString(),
-        displayName: project.displayName,
-        name: project.name,
+        name: `projects/${project._name}`,
+        fields: {
+          displayName: { stringValue: project.displayName },
+          description: { stringValue: project.description || "" },
+          ownerId: { stringValue: project.ownerId },
+          createdAt: { timestampValue: project.createdAt.toISOString() },
+          updatedAt: { timestampValue: project.updatedAt.toISOString() }
+        }
       },
     });
   } catch (error) {
@@ -366,8 +410,8 @@ async function createProjectHandler(req, res, mongoClient) {
 
     // Create project
     const newProject = {
+      _name: sanitizedName, // Use sanitized name as _name for database operations
       displayName: name.trim(), // Store original name for display
-      name: sanitizedName, // Store sanitized name for database operations
       description: description || "",
       ownerId: userId,
       apiKey,
@@ -379,31 +423,34 @@ async function createProjectHandler(req, res, mongoClient) {
       .db("basebase")
       .collection("projects");
 
-    // Create unique index on name if it doesn't exist
+    // Create unique index on _name if it doesn't exist
     try {
-      await projectsCollection.createIndex({ name: 1 }, { unique: true });
+      await projectsCollection.createIndex({ _name: 1 }, { unique: true });
     } catch (indexError) {
       // Index might already exist, that's fine
-      console.log("Index creation info:", indexError.message);
+      console.log("Projects _name index creation info:", indexError.message);
     }
 
     const result = await projectsCollection.insertOne(newProject);
     const project = await projectsCollection.findOne({
-      _id: result.insertedId,
+      _name: newProject._name,
     });
 
     res.status(201).json({
       project: {
-        id: project._id.toString(),
-        displayName: project.displayName,
-        name: project.name,
-        description: project.description,
-        createdAt: project.createdAt,
+        name: `projects/${project._name}`,
+        fields: {
+          displayName: { stringValue: project.displayName },
+          description: { stringValue: project.description || "" },
+          ownerId: { stringValue: project.ownerId },
+          createdAt: { timestampValue: project.createdAt.toISOString() },
+          updatedAt: { timestampValue: project.updatedAt.toISOString() }
+        }
       },
       apiKey: project.apiKey,
       warning:
         "⚠️  IMPORTANT: Store this API key securely! It cannot be retrieved again.",
-      note: `Database name will be: ${project.name}`,
+      note: `Database name will be: ${project._name}`,
     });
   } catch (error) {
     console.error("Create project error:", error);
@@ -430,12 +477,15 @@ async function listProjectsHandler(req, res, mongoClient) {
       .toArray();
 
     const projectList = projects.map((project) => ({
-      id: project._id.toString(),
-      displayName: project.displayName,
-      name: project.name,
-      description: project.description,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
+      name: `projects/${project._name}`,
+      fields: {
+        displayName: { stringValue: project.displayName },
+        name: { stringValue: project.name },
+        description: { stringValue: project.description || "" },
+        ownerId: { stringValue: project.ownerId },
+        createdAt: { timestampValue: project.createdAt.toISOString() },
+        updatedAt: { timestampValue: project.updatedAt.toISOString() }
+      }
     }));
 
     res.json({
@@ -460,7 +510,7 @@ async function regenerateApiKeyHandler(req, res, mongoClient) {
 
     // Check if project exists and user owns it
     const project = await projectsCollection.findOne({
-      _id: new (require("mongodb").ObjectId)(projectId),
+      _name: projectId,
       ownerId: userId,
     });
 
@@ -473,7 +523,7 @@ async function regenerateApiKeyHandler(req, res, mongoClient) {
 
     // Update project with new API key
     await projectsCollection.updateOne(
-      { _id: project._id },
+      { _name: project._name },
       {
         $set: {
           apiKey: newApiKey,
@@ -484,10 +534,14 @@ async function regenerateApiKeyHandler(req, res, mongoClient) {
 
     res.json({
       project: {
-        id: project._id.toString(),
-        displayName: project.displayName,
-        name: project.name,
-        description: project.description,
+        name: `projects/${project._name}`,
+        fields: {
+          displayName: { stringValue: project.displayName },
+          description: { stringValue: project.description || "" },
+          ownerId: { stringValue: project.ownerId },
+          createdAt: { timestampValue: project.createdAt.toISOString() },
+          updatedAt: { timestampValue: project.updatedAt.toISOString() }
+        }
       },
       apiKey: newApiKey,
       warning:
