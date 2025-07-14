@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const { MongoClient, ObjectId } = require("mongodb");
+const crypto = require("crypto");
 const cors = require("cors");
 const { authenticateToken, setupAuthRoutes } = require("./auth");
 
@@ -45,6 +46,35 @@ function getDbAndCollection(projectName, collectionName) {
 // Helper function to validate MongoDB ObjectId format
 function isValidObjectId(id) {
   return /^[0-9a-fA-F]{24}$/.test(id);
+}
+
+// Helper function to generate 72-bit base64 _name ID
+function generateName() {
+  // Generate 9 bytes (72 bits) of random data
+  const randomBytes = crypto.randomBytes(9);
+  // Convert to base64 and make URL-safe
+  return randomBytes.toString('base64url');
+}
+
+// Helper function to validate _name format
+function isValidName(name) {
+  if (!name || typeof name !== 'string') return false;
+  
+  // Must be URL-safe, less than 24 characters
+  if (name.length >= 24) return false;
+  
+  // URL-safe characters: letters, numbers, hyphens, underscores
+  return /^[A-Za-z0-9_-]+$/.test(name);
+}
+
+// Helper function to find document by _name or fallback to _id
+function buildDocumentQuery(documentId) {
+  // If it looks like an ObjectId, use _id for backward compatibility
+  if (isValidObjectId(documentId)) {
+    return { _id: new ObjectId(documentId) };
+  }
+  // Otherwise use _name field
+  return { _name: documentId };
 }
 
 // Helper function to resolve project name to database name
@@ -277,8 +307,13 @@ function convertToFirestoreFormat(mongoDoc) {
   const firestoreDoc = { fields: {} };
 
   for (const [key, value] of Object.entries(mongoDoc)) {
+    if (key === "_name") {
+      firestoreDoc.name = value;
+      continue;
+    }
+    
+    // Skip MongoDB _id field from output
     if (key === "_id") {
-      firestoreDoc.name = value.toString();
       continue;
     }
 
@@ -304,7 +339,7 @@ function convertToFirestoreFormat(mongoDoc) {
 
 // CRUD ENDPOINTS (JWT required)
 
-// CREATE - POST document (auto-generated ObjectId only)
+// CREATE - POST document (auto-generated _name ID)
 app.post(
   "/:projectName/:collectionName",
   checkConnection,
@@ -356,7 +391,31 @@ app.post(
       const { collection } = getDbAndCollection(targetDbName, collectionName);
       const document = convertFromFirestoreFormat(req.body);
 
-      // Always use auto-generated ObjectId
+      // Generate unique _name ID
+      let documentName;
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      do {
+        documentName = generateName();
+        attempts++;
+        
+        // Check if _name already exists
+        const existingDoc = await collection.findOne({ _name: documentName });
+        if (!existingDoc) break;
+        
+        if (attempts >= maxAttempts) {
+          console.error(`[CREATE] Failed to generate unique _name after ${maxAttempts} attempts`);
+          return res.status(500).json({
+            error: "Failed to generate unique document ID",
+            suggestion: "Please try again. Contact support if the problem persists.",
+          });
+        }
+      } while (attempts < maxAttempts);
+
+      // Add _name to document
+      document._name = documentName;
+
       const result = await collection.insertOne(document);
 
       // Initialize collection metadata if this is a new collection
@@ -369,7 +428,7 @@ app.post(
 
       const insertedDoc = await collection.findOne({ _id: result.insertedId });
       console.log(
-        `[CREATE] Successfully created document with ID ${result.insertedId} in ${targetDbName}/${collectionName}`
+        `[CREATE] Successfully created document with _name ${documentName} in ${targetDbName}/${collectionName}`
       );
       res.status(201).json(convertToFirestoreFormat(insertedDoc));
     } catch (error) {
@@ -545,9 +604,9 @@ app.get(
 
       const { collection } = getDbAndCollection(targetDbName, collectionName);
 
-      const document = await collection.findOne({
-        _id: new ObjectId(documentId),
-      });
+      // Build query to find document by _name or _id (for backward compatibility)
+      const query = buildDocumentQuery(documentId);
+      const document = await collection.findOne(query);
 
       if (!document) {
         console.log(
@@ -629,9 +688,20 @@ app.patch(
       const { collection } = getDbAndCollection(targetDbName, collectionName);
 
       const updateData = convertFromFirestoreFormat(req.body);
+      
+      // Prevent modification of _name field
+      if (updateData._name !== undefined) {
+        return res.status(400).json({
+          error: "Cannot modify _name field",
+          suggestion: "The _name field is immutable. Use PUT to replace the entire document or create a new document with a different _name.",
+        });
+      }
+      
+      // Build query to find document by _name or _id (for backward compatibility)
+      const query = buildDocumentQuery(documentId);
 
       const result = await collection.updateOne(
-        { _id: new ObjectId(documentId) },
+        query,
         { $set: updateData }
       );
 
@@ -642,9 +712,7 @@ app.patch(
       // Apply collection indexes after successful document update
       await applyCollectionIndexes(targetDbName, collectionName);
 
-      const updatedDoc = await collection.findOne({
-        _id: new ObjectId(documentId),
-      });
+      const updatedDoc = await collection.findOne(query);
       res.json(convertToFirestoreFormat(updatedDoc));
     } catch (error) {
       console.error("Update error:", error);
@@ -653,7 +721,7 @@ app.patch(
   }
 );
 
-// SET - PUT document (create or replace with specific ID)
+// SET - PUT document (create or replace with specific _name ID)
 app.put(
   "/:projectName/:collectionName/:documentId",
   checkConnection,
@@ -668,13 +736,13 @@ app.put(
       );
       console.log(`[SET] Body:`, req.body);
 
-      // Validate ObjectId format
-      if (!isValidObjectId(documentId)) {
-        console.error(`[SET] Invalid ObjectId format: ${documentId}`);
+      // Validate _name format (allow ObjectId for backward compatibility)
+      if (!isValidObjectId(documentId) && !isValidName(documentId)) {
+        console.error(`[SET] Invalid document ID format: ${documentId}`);
         return res.status(400).json({
           error: "Invalid document ID format",
           suggestion:
-            "Document ID must be a 24-character hexadecimal string (MongoDB ObjectId format)",
+            "Document ID must be URL-safe, less than 24 characters, or a 24-character hexadecimal ObjectId for backward compatibility",
         });
       }
 
@@ -712,9 +780,17 @@ app.put(
       const { collection } = getDbAndCollection(targetDbName, collectionName);
       const document = convertFromFirestoreFormat(req.body);
 
+      // Build query for finding existing document
+      const query = buildDocumentQuery(documentId);
+      
+      // For new documents with _name, ensure _name is set in document
+      if (!isValidObjectId(documentId)) {
+        document._name = documentId;
+      }
+
       // Use replaceOne with upsert to implement set behavior
       const result = await collection.replaceOne(
-        { _id: new ObjectId(documentId) },
+        query,
         document,
         { upsert: true }
       );
@@ -727,9 +803,7 @@ app.put(
       // Apply collection indexes after successful document operation
       await applyCollectionIndexes(targetDbName, collectionName);
 
-      const setDoc = await collection.findOne({
-        _id: new ObjectId(documentId),
-      });
+      const setDoc = await collection.findOne(query);
 
       if (result.upsertedCount > 0) {
         console.log(
@@ -773,9 +847,9 @@ app.delete(
 
       const { collection } = getDbAndCollection(targetDbName, collectionName);
 
-      const result = await collection.deleteOne({
-        _id: new ObjectId(documentId),
-      });
+      // Build query to find document by _name or _id (for backward compatibility)
+      const query = buildDocumentQuery(documentId);
+      const result = await collection.deleteOne(query);
 
       if (result.deletedCount === 0) {
         return res.status(404).json({ error: "Document not found" });
@@ -803,15 +877,15 @@ function getRouteSuggestion(method, path) {
   const pathParts = path.split("/").filter((part) => part);
 
   if (method === "POST" && pathParts.length === 3) {
-    return `Custom document IDs are not supported. To create a document in collection '${pathParts[1]}' of project '${pathParts[0]}' with auto-generated ID, use: POST /${pathParts[0]}/${pathParts[1]}`;
+    return `Custom document IDs are not supported with POST. To create a document in collection '${pathParts[1]}' of project '${pathParts[0]}' with auto-generated _name, use: POST /${pathParts[0]}/${pathParts[1]}`;
   } else if (method === "POST" && pathParts.length === 2) {
-    return `To create a document in collection '${pathParts[1]}' of project '${pathParts[0]}' with auto-generated ID, use: POST /${pathParts[0]}/${pathParts[1]}`;
+    return `To create a document in collection '${pathParts[1]}' of project '${pathParts[0]}' with auto-generated _name, use: POST /${pathParts[0]}/${pathParts[1]}`;
   } else if (method === "GET" && pathParts.length === 3) {
     return `To get document '${pathParts[2]}' from collection '${pathParts[1]}' of project '${pathParts[0]}', use: GET /${pathParts[0]}/${pathParts[1]}/${pathParts[2]}`;
   } else if (method === "GET" && pathParts.length === 2) {
     return `To get all documents from collection '${pathParts[1]}' of project '${pathParts[0]}', use: GET /${pathParts[0]}/${pathParts[1]}`;
   } else if (method === "PUT" && pathParts.length === 3) {
-    return `To set (create or replace) document '${pathParts[2]}' in collection '${pathParts[1]}' of project '${pathParts[0]}', use: PUT /${pathParts[0]}/${pathParts[1]}/${pathParts[2]} (ID must be 24-character hex)`;
+    return `To set (create or replace) document '${pathParts[2]}' in collection '${pathParts[1]}' of project '${pathParts[0]}', use: PUT /${pathParts[0]}/${pathParts[1]}/${pathParts[2]} (ID must be URL-safe, <24 chars)`;
   }
 
   return `Check the available routes listed above for the correct API endpoint format.`;
@@ -831,7 +905,7 @@ async function startServer() {
     console.log(
       `  POST /${req.params.projectName || "[projectName]"}/${
         req.params.collectionName || "[collectionName]"
-      } - Create document (auto-generated ID)`
+      } - Create document (auto-generated _name)`
     );
     console.log(
       `  GET /${req.params.projectName || "[projectName]"}/${
@@ -851,7 +925,7 @@ async function startServer() {
     console.log(
       `  PUT /${req.params.projectName || "[projectName]"}/${
         req.params.collectionName || "[collectionName]"
-      }/[documentId] - Set document (create or replace)`
+      }/[documentId] - Set document (create or replace with specific _name)`
     );
     console.log(
       `  DELETE /${req.params.projectName || "[projectName]"}/${
@@ -865,10 +939,10 @@ async function startServer() {
       path: req.path,
       suggestion: getRouteSuggestion(req.method, req.path),
       availableRoutes: {
-        create: "POST /:projectName/:collectionName (auto-generated ID)",
+        create: "POST /:projectName/:collectionName (auto-generated _name)",
         read: "GET /:projectName/:collectionName or GET /:projectName/:collectionName/:documentId",
         update: "PATCH /:projectName/:collectionName/:documentId",
-        set: "PUT /:projectName/:collectionName/:documentId (create or replace with specific ID)",
+        set: "PUT /:projectName/:collectionName/:documentId (create or replace with specific _name)",
         delete: "DELETE /:projectName/:collectionName/:documentId",
         auth: "POST /requestCode, POST /verifyCode",
         projects: "GET /projects, POST /projects",

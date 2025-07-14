@@ -10,7 +10,10 @@
     "create-project": "node scripts/create-project.js",
     "setup": "node scripts/setup.js",
     "manage-security-rules": "node scripts/manage-security-rules.js",
-    "test-index-application": "node scripts/test-index-application.js"
+    "test-index-application": "node scripts/test-index-application.js",
+    "migrate-to-names": "node scripts/migrate-to-names.js",
+    "migrate-dry-run": "node scripts/migrate-to-names.js --dry-run --verbose",
+    "check-indexes": "node scripts/check-indexes.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
