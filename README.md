@@ -90,7 +90,7 @@ Body: {
 }
 ```
 
-**Note:** POST only supports auto-generated MongoDB ObjectIds. To create or replace a document with a specific ID, use the PUT endpoint instead.
+**Note:** POST creates documents with auto-generated `_name` IDs (72-bit base64 strings). To create or replace a document with a specific ID, use the PUT endpoint instead.
 
 ### READ - GET
 
@@ -135,7 +135,7 @@ Body: {
 }
 ```
 
-**Note:** `DOCUMENT_ID` must be a valid 24-character hexadecimal MongoDB ObjectId (e.g., `507f1f77bcf86cd799439011`). This endpoint implements "set" behavior - it will create the document if it doesn't exist, or completely replace it if it does exist.
+**Note:** `DOCUMENT_ID` can be any URL-safe string less than 24 characters, or a valid 24-character hexadecimal MongoDB ObjectId for backward compatibility. This endpoint implements "set" behavior - it will create the document if it doesn't exist, or completely replace it if it does exist.
 
 ### DELETE - DELETE
 
@@ -347,7 +347,7 @@ The API uses a simple path structure:
 
 - `PROJECT_NAME` can be either the display name or database name
 - `COLLECTION_NAME` maps to MongoDB collection name
-- `DOCUMENT_ID` maps to MongoDB document `_id`
+- `DOCUMENT_ID` maps to document `_name` field (or `_id` for backward compatibility)
 
 Examples:
 
