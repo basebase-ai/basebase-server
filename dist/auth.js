@@ -102,32 +102,22 @@ function generateVerificationCode() {
     return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
 }
 // Helper function to get or create user
-async function getOrCreateUser(mongoClient, name, phone) {
+async function getOrCreateUser(mongoClient, username, phone) {
     const usersCollection = mongoClient.db("basebase").collection("users");
-    // Create unique index on _id (already exists by default)
-    // Check if user already exists
+    // Check if user already exists by phone
     let user = (await usersCollection.findOne({ phone }));
     if (!user) {
-        // Generate unique _id for user
-        let userId;
-        const maxAttempts = 10;
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            userId = generateName();
-            // Check if _id already exists
-            const existingUser = await usersCollection.findOne({
-                _id: userId,
-            });
-            if (!existingUser) {
-                break;
-            }
-            if (attempt === maxAttempts - 1) {
-                throw new Error("Failed to generate unique _id for user after multiple attempts");
-            }
+        // Check if username already exists as _id
+        const existingUserWithUsername = await usersCollection.findOne({
+            _id: username,
+        });
+        if (existingUserWithUsername) {
+            throw new Error("Username already exists");
         }
-        // Create new user
+        // Create new user with username as _id
         const newUser = {
-            _id: userId,
-            name,
+            _id: username,
+            name: "New User",
             phone,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -199,9 +189,9 @@ async function sendSMS(phone, message) {
 // Request verification code endpoint
 async function requestCodeHandler(req, res, mongoClient) {
     try {
-        const { name, phone } = req.body;
-        if (!name || !phone) {
-            res.status(400).json({ error: "Name and phone are required" });
+        const { username, phone } = req.body;
+        if (!username || !phone) {
+            res.status(400).json({ error: "Username and phone are required" });
             return;
         }
         // Phone validation - enforce strict +1234567890 format
@@ -212,7 +202,7 @@ async function requestCodeHandler(req, res, mongoClient) {
             return;
         }
         // Create or get user
-        const user = await getOrCreateUser(mongoClient, name, phone);
+        const user = await getOrCreateUser(mongoClient, username, phone);
         // Generate verification code
         const code = generateVerificationCode();
         // Store code
@@ -239,7 +229,12 @@ async function requestCodeHandler(req, res, mongoClient) {
     }
     catch (error) {
         console.error("Request code error:", error);
-        res.status(500).json({ error: "Failed to request verification code" });
+        if (error.message === "Username already exists") {
+            res.status(400).json({ error: "Username already exists" });
+        }
+        else {
+            res.status(500).json({ error: "Failed to request verification code" });
+        }
     }
 }
 // Verify code and get JWT endpoint

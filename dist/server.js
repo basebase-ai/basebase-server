@@ -621,11 +621,10 @@ app.put("/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:d
         // Build query to find existing document by _name or _id (for backward compatibility)
         const query = buildDocumentQuery(documentId);
         const existingDoc = await collection.findOne(query);
-        // Set the _id field to the specified document ID
-        document._id = documentId;
         const now = new Date();
         if (existingDoc) {
-            // Update existing document (preserve createTime)
+            // Update existing document (preserve createTime and existing _id)
+            document._id = existingDoc._id; // Preserve the existing _id field exactly as it is
             document.createTime = existingDoc.createTime || now;
             document.updateTime = now;
             console.log(`[SET] Replacing existing document ${documentId} in ${targetDbName}/${collectionId}`);
@@ -633,6 +632,7 @@ app.put("/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:d
         }
         else {
             // Create new document
+            document._id = documentId; // Only set _id for new documents
             document.createTime = now;
             document.updateTime = now;
             console.log(`[SET] Creating new document ${documentId} in ${targetDbName}/${collectionId}`);

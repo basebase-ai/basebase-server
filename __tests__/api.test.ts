@@ -27,7 +27,7 @@ describe("API Integration Tests", () => {
   describe("Authentication", () => {
     test("should request verification code", async () => {
       const response = await request(testHelper.app).post("/requestCode").send({
-        name: "Test User",
+        username: "Test User",
         phone: "+15551234567",
       });
 
@@ -40,7 +40,7 @@ describe("API Integration Tests", () => {
       const requestResponse = await request(testHelper.app)
         .post("/requestCode")
         .send({
-          name: "Test User",
+          username: "Test User",
           phone: "+15551234567",
         });
 

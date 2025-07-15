@@ -26,7 +26,7 @@ describe("API Integration Tests", () => {
     describe("Authentication", () => {
         test("should request verification code", async () => {
             const response = await (0, supertest_1.default)(testHelper.app).post("/requestCode").send({
-                name: "Test User",
+                username: "Test User",
                 phone: "+15551234567",
             });
             expect(response.status).toBe(200);
@@ -37,7 +37,7 @@ describe("API Integration Tests", () => {
             const requestResponse = await (0, supertest_1.default)(testHelper.app)
                 .post("/requestCode")
                 .send({
-                name: "Test User",
+                username: "Test User",
                 phone: "+15551234567",
             });
             expect(requestResponse.status).toBe(200);

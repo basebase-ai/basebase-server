@@ -190,43 +190,28 @@ function generateVerificationCode(): string {
 // Helper function to get or create user
 async function getOrCreateUser(
   mongoClient: MongoClient,
-  name: string,
+  username: string,
   phone: string
 ): Promise<User> {
   const usersCollection = mongoClient.db("basebase").collection("users");
 
-  // Create unique index on _id (already exists by default)
-
-  // Check if user already exists
+  // Check if user already exists by phone
   let user = (await usersCollection.findOne({ phone })) as User | null;
 
   if (!user) {
-    // Generate unique _id for user
-    let userId: string;
-    const maxAttempts = 10;
+    // Check if username already exists as _id
+    const existingUserWithUsername = await usersCollection.findOne({
+      _id: username,
+    } as any);
 
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      userId = generateName();
-
-      // Check if _id already exists
-      const existingUser = await usersCollection.findOne({
-        _id: userId,
-      } as any);
-      if (!existingUser) {
-        break;
-      }
-
-      if (attempt === maxAttempts - 1) {
-        throw new Error(
-          "Failed to generate unique _id for user after multiple attempts"
-        );
-      }
+    if (existingUserWithUsername) {
+      throw new Error("Username already exists");
     }
 
-    // Create new user
+    // Create new user with username as _id
     const newUser: any = {
-      _id: userId!,
-      name,
+      _id: username,
+      name: "New User",
       phone,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -331,10 +316,10 @@ async function requestCodeHandler(
   mongoClient: MongoClient
 ): Promise<void> {
   try {
-    const { name, phone } = req.body;
+    const { username, phone } = req.body;
 
-    if (!name || !phone) {
-      res.status(400).json({ error: "Name and phone are required" });
+    if (!username || !phone) {
+      res.status(400).json({ error: "Username and phone are required" });
       return;
     }
 
@@ -348,7 +333,7 @@ async function requestCodeHandler(
     }
 
     // Create or get user
-    const user = await getOrCreateUser(mongoClient, name, phone);
+    const user = await getOrCreateUser(mongoClient, username, phone);
 
     // Generate verification code
     const code = generateVerificationCode();
@@ -381,7 +366,12 @@ async function requestCodeHandler(
     }
   } catch (error) {
     console.error("Request code error:", error);
-    res.status(500).json({ error: "Failed to request verification code" });
+
+    if ((error as Error).message === "Username already exists") {
+      res.status(400).json({ error: "Username already exists" });
+    } else {
+      res.status(500).json({ error: "Failed to request verification code" });
+    }
   }
 }
 

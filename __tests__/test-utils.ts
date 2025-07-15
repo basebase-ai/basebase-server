@@ -155,11 +155,11 @@ export class TestHelper {
     console.log("Creating test user...");
 
     try {
-      // Step 1: Request verification code - needs name and phone
+      // Step 1: Request verification code - needs username and phone
       const requestResponse = await request(this.app)
         .post("/requestCode")
         .send({
-          name: "Test User",
+          username: "Test User",
           phone: this.testPhoneNumber,
         });
 
