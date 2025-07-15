@@ -890,12 +890,10 @@ app.put(
       const query = buildDocumentQuery(documentId);
       const existingDoc = await collection.findOne(query);
 
-      // Set the _id field to the specified document ID
-      document._id = documentId;
-
       const now = new Date();
       if (existingDoc) {
-        // Update existing document (preserve createTime)
+        // Update existing document (preserve createTime and existing _id)
+        document._id = existingDoc._id; // Preserve the existing _id field exactly as it is
         document.createTime = existingDoc.createTime || now;
         document.updateTime = now;
 
@@ -905,6 +903,7 @@ app.put(
         await collection.replaceOne(query, document);
       } else {
         // Create new document
+        document._id = documentId; // Only set _id for new documents
         document.createTime = now;
         document.updateTime = now;
 
