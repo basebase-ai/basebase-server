@@ -446,4 +446,261 @@ describe("API Integration Tests", () => {
       expect(response.body.error).toBe("Invalid document ID");
     });
   });
+
+  describe("Firebase Array Format Conversion", () => {
+    const testProject = "test-project";
+    const testCollection = "array-test";
+
+    test("should convert Firebase arrayValue to JavaScript array on creation", async () => {
+      const documentData = {
+        fields: {
+          sourceIds: {
+            arrayValue: {
+              values: [
+                { stringValue: "6866ef5247046c6267ad35bb" },
+                { stringValue: "685d9e632efa0f2fbc8f4261" },
+                { stringValue: "68012d04af809cb7c12f6233" },
+              ],
+            },
+          },
+          friends: { arrayValue: { values: [] } },
+          denseMode: { booleanValue: false },
+          darkMode: { booleanValue: false },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(
+          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+        )
+        .send(documentData);
+
+      expect(response.status).toBe(201);
+
+      // Verify response has Firebase format
+      expect(response.body.fields.sourceIds.arrayValue).toBeDefined();
+      expect(response.body.fields.sourceIds.arrayValue.values).toHaveLength(3);
+      expect(
+        response.body.fields.sourceIds.arrayValue.values[0].stringValue
+      ).toBe("6866ef5247046c6267ad35bb");
+
+      // Verify empty array
+      expect(response.body.fields.friends.arrayValue).toBeDefined();
+      expect(response.body.fields.friends.arrayValue.values).toHaveLength(0);
+    });
+
+    test("should handle arrays with mixed data types", async () => {
+      const documentData = {
+        fields: {
+          mixedArray: {
+            arrayValue: {
+              values: [
+                { stringValue: "hello" },
+                { integerValue: "42" },
+                { doubleValue: 3.14 },
+                { booleanValue: true },
+                { nullValue: null },
+              ],
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(
+          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+        )
+        .send(documentData);
+
+      expect(response.status).toBe(201);
+
+      const arrayValues = response.body.fields.mixedArray.arrayValue.values;
+      expect(arrayValues).toHaveLength(5);
+      expect(arrayValues[0].stringValue).toBe("hello");
+      expect(arrayValues[1].integerValue).toBe("42");
+      expect(arrayValues[2].doubleValue).toBe(3.14);
+      expect(arrayValues[3].booleanValue).toBe(true);
+      expect(arrayValues[4].nullValue).toBe(null);
+    });
+
+    test("should handle nested arrays", async () => {
+      const documentData = {
+        fields: {
+          nestedArray: {
+            arrayValue: {
+              values: [
+                {
+                  arrayValue: {
+                    values: [
+                      { stringValue: "nested1" },
+                      { stringValue: "nested2" },
+                    ],
+                  },
+                },
+                { stringValue: "regular" },
+              ],
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(
+          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+        )
+        .send(documentData);
+
+      expect(response.status).toBe(201);
+
+      const arrayValues = response.body.fields.nestedArray.arrayValue.values;
+      expect(arrayValues).toHaveLength(2);
+      expect(arrayValues[0].arrayValue.values).toHaveLength(2);
+      expect(arrayValues[0].arrayValue.values[0].stringValue).toBe("nested1");
+      expect(arrayValues[1].stringValue).toBe("regular");
+    });
+
+    test("should update document with array using PUT", async () => {
+      const customId = "array-update-test";
+
+      // Create initial document
+      const initialData = {
+        fields: {
+          sourceIds: {
+            arrayValue: {
+              values: [
+                { stringValue: "original1" },
+                { stringValue: "original2" },
+              ],
+            },
+          },
+          friends: { arrayValue: { values: [] } },
+          denseMode: { booleanValue: false },
+          darkMode: { booleanValue: false },
+        },
+      };
+
+      await testHelper
+        .authenticatedRequest(userToken)
+        .put(
+          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+        )
+        .send(initialData);
+
+      // Update with new array data
+      const updateData = {
+        fields: {
+          sourceIds: {
+            arrayValue: {
+              values: [
+                { stringValue: "6866ef5247046c6267ad35bb" },
+                { stringValue: "685d9e632efa0f2fbc8f4261" },
+                { stringValue: "68012d04af809cb7c12f6233" },
+                { stringValue: "685c30110a0fda743945d460" },
+              ],
+            },
+          },
+          friends: {
+            arrayValue: {
+              values: [{ stringValue: "friend1" }, { stringValue: "friend2" }],
+            },
+          },
+          denseMode: { booleanValue: true },
+          darkMode: { booleanValue: false },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .put(
+          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+        )
+        .send(updateData);
+
+      expect(response.status).toBe(200);
+      expect(response.body.fields.sourceIds.arrayValue.values).toHaveLength(4);
+      expect(response.body.fields.friends.arrayValue.values).toHaveLength(2);
+      expect(response.body.fields.denseMode.booleanValue).toBe(true);
+    });
+
+    test("should update document with array using PATCH", async () => {
+      const customId = "array-patch-test";
+
+      // Create initial document
+      const initialData = {
+        fields: {
+          sourceIds: {
+            arrayValue: {
+              values: [
+                { stringValue: "original1" },
+                { stringValue: "original2" },
+              ],
+            },
+          },
+          keepThis: { stringValue: "preserve" },
+        },
+      };
+
+      await testHelper
+        .authenticatedRequest(userToken)
+        .put(
+          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+        )
+        .send(initialData);
+
+      // Patch only the array
+      const patchData = {
+        fields: {
+          sourceIds: {
+            arrayValue: {
+              values: [
+                { stringValue: "updated1" },
+                { stringValue: "updated2" },
+                { stringValue: "updated3" },
+              ],
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .patch(
+          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+        )
+        .send(patchData);
+
+      expect(response.status).toBe(200);
+      expect(response.body.fields.sourceIds.arrayValue.values).toHaveLength(3);
+      expect(
+        response.body.fields.sourceIds.arrayValue.values[0].stringValue
+      ).toBe("updated1");
+      // Verify other field is preserved
+      expect(response.body.fields.keepThis.stringValue).toBe("preserve");
+    });
+
+    test("should handle empty arrays", async () => {
+      const documentData = {
+        fields: {
+          emptyArray: { arrayValue: { values: [] } },
+          emptyArrayNoValues: { arrayValue: {} },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(
+          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+        )
+        .send(documentData);
+
+      expect(response.status).toBe(201);
+      expect(response.body.fields.emptyArray.arrayValue.values).toHaveLength(0);
+      expect(
+        response.body.fields.emptyArrayNoValues.arrayValue.values
+      ).toHaveLength(0);
+    });
+  });
 });

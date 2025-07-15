@@ -358,6 +358,34 @@ function convertFromFirestoreFormat(firestoreDoc: any): MongoDocument {
       mongoDoc[key] = (value as any).booleanValue;
     } else if ((value as any).nullValue !== undefined) {
       mongoDoc[key] = null;
+    } else if ((value as any).arrayValue !== undefined) {
+      // Handle Firebase arrayValue format
+      const arrayValue = (value as any).arrayValue;
+      if (arrayValue.values && Array.isArray(arrayValue.values)) {
+        mongoDoc[key] = arrayValue.values.map((item: any) => {
+          // Convert each array item from Firebase format
+          if (item.stringValue !== undefined) {
+            return item.stringValue;
+          } else if (item.integerValue !== undefined) {
+            return parseInt(item.integerValue);
+          } else if (item.doubleValue !== undefined) {
+            return parseFloat(item.doubleValue);
+          } else if (item.booleanValue !== undefined) {
+            return item.booleanValue;
+          } else if (item.nullValue !== undefined) {
+            return null;
+          } else if (item.arrayValue !== undefined) {
+            // Recursively handle nested arrays
+            return convertFromFirestoreFormat({ fields: { temp: item } }).temp;
+          } else {
+            // Return as-is if it's already a plain value
+            return item;
+          }
+        });
+      } else {
+        // Empty array case
+        mongoDoc[key] = [];
+      }
     } else {
       mongoDoc[key] = value;
     }
@@ -390,6 +418,38 @@ function convertToFirestoreFormat(mongoDoc: MongoDocument): FirestoreDocument {
       firestoreDoc.fields[key] = { nullValue: null };
     } else if (value instanceof Date) {
       firestoreDoc.fields[key] = { stringValue: value.toISOString() };
+    } else if (Array.isArray(value)) {
+      // Handle arrays by converting to Firebase arrayValue format
+      firestoreDoc.fields[key] = {
+        arrayValue: {
+          values: value.map((item: any) => {
+            if (typeof item === "string") {
+              return { stringValue: item };
+            } else if (typeof item === "number") {
+              if (Number.isInteger(item)) {
+                return { integerValue: item.toString() };
+              } else {
+                return { doubleValue: item };
+              }
+            } else if (typeof item === "boolean") {
+              return { booleanValue: item };
+            } else if (item === null) {
+              return { nullValue: null };
+            } else if (item instanceof Date) {
+              return { stringValue: item.toISOString() };
+            } else if (Array.isArray(item)) {
+              // Recursively handle nested arrays
+              const nestedArray = convertToFirestoreFormat({
+                temp: item,
+              } as MongoDocument);
+              return nestedArray.fields.temp;
+            } else {
+              // Return as-is for complex objects
+              return item;
+            }
+          }),
+        },
+      };
     } else {
       firestoreDoc.fields[key] = value;
     }
