@@ -60,14 +60,6 @@ interface FirestoreUser {
   };
 }
 
-// Helper function to generate 72-bit base64 _name ID (same as server.ts)
-function generateName(): string {
-  // Generate 9 bytes (72 bits) of random data
-  const randomBytes = crypto.randomBytes(9);
-  // Convert to base64 and make URL-safe
-  return randomBytes.toString("base64url");
-}
-
 // Initialize Twilio client
 const twilioClient = twilio(
   process.env.TWILIO_ACCOUNT_SID!,
@@ -133,8 +125,8 @@ async function ensureUniqueProjectName(
   while (true) {
     // Check if name exists for this user or globally (since it will be a DB name)
     const existingProject = await projectsCollection.findOne({
-      _name: uniqueName,
-    });
+      _id: uniqueName,
+    } as any);
 
     if (!existingProject) {
       return uniqueName;
@@ -579,7 +571,7 @@ async function createProjectHandler(
 
     // Create project
     const newProject: Project = {
-      _id: sanitizedName, // Use sanitized name as _name for database operations
+      _id: sanitizedName, // Use sanitized name as _id for database operations
       displayName: name.trim(), // Store original name for display
       description: description || "",
       ownerId: userId,
@@ -592,13 +584,13 @@ async function createProjectHandler(
       .db("basebase")
       .collection("projects");
 
-    // Create unique index on _name if it doesn't exist
+    // Create unique index on _id if it doesn't exist
     try {
-      await projectsCollection.createIndex({ _name: 1 }, { unique: true });
+      await projectsCollection.createIndex({ _id: 1 }, { unique: true });
     } catch (indexError) {
       // Index might already exist, that's fine
       console.log(
-        "Projects _name index creation info:",
+        "Projects _id index creation info:",
         (indexError as Error).message
       );
     }

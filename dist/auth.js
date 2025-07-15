@@ -9,13 +9,6 @@ exports.setupAuthRoutes = setupAuthRoutes;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const crypto_1 = __importDefault(require("crypto"));
 const twilio_1 = __importDefault(require("twilio"));
-// Helper function to generate 72-bit base64 _name ID (same as server.ts)
-function generateName() {
-    // Generate 9 bytes (72 bits) of random data
-    const randomBytes = crypto_1.default.randomBytes(9);
-    // Convert to base64 and make URL-safe
-    return randomBytes.toString("base64url");
-}
 // Initialize Twilio client
 const twilioClient = (0, twilio_1.default)(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -60,7 +53,7 @@ async function ensureUniqueProjectName(mongoClient, baseName, userId) {
     while (true) {
         // Check if name exists for this user or globally (since it will be a DB name)
         const existingProject = await projectsCollection.findOne({
-            _name: uniqueName,
+            _id: uniqueName,
         });
         if (!existingProject) {
             return uniqueName;
@@ -393,7 +386,7 @@ async function createProjectHandler(req, res, mongoClient) {
         const apiKey = generateApiKey();
         // Create project
         const newProject = {
-            _id: sanitizedName, // Use sanitized name as _name for database operations
+            _id: sanitizedName, // Use sanitized name as _id for database operations
             displayName: name.trim(), // Store original name for display
             description: description || "",
             ownerId: userId,
@@ -404,13 +397,13 @@ async function createProjectHandler(req, res, mongoClient) {
         const projectsCollection = mongoClient
             .db("basebase")
             .collection("projects");
-        // Create unique index on _name if it doesn't exist
+        // Create unique index on _id if it doesn't exist
         try {
-            await projectsCollection.createIndex({ _name: 1 }, { unique: true });
+            await projectsCollection.createIndex({ _id: 1 }, { unique: true });
         }
         catch (indexError) {
             // Index might already exist, that's fine
-            console.log("Projects _name index creation info:", indexError.message);
+            console.log("Projects _id index creation info:", indexError.message);
         }
         await projectsCollection.insertOne(newProject);
         const project = (await projectsCollection.findOne({

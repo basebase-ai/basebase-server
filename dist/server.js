@@ -61,7 +61,7 @@ function isValidDocumentId(id) {
     // Allow both ObjectId format (for backward compatibility) and custom names
     return isValidObjectId(id) || isValidName(id);
 }
-// Helper function to generate 72-bit base64 _name ID
+// Helper function to generate 72-bit base64 _id ID
 function generateName() {
     // Generate 9 bytes (72 bits) of random data
     const randomBytes = crypto_1.default.randomBytes(9);
@@ -278,7 +278,7 @@ function convertToFirestoreFormat(mongoDoc) {
     return firestoreDoc;
 }
 // CRUD ENDPOINTS (JWT required)
-// CREATE - POST document (auto-generated _name ID)
+// CREATE - POST document (auto-generated _id ID)
 app.post("/projects/:projectId/databases/\\(default\\)/documents/:collectionId", checkConnection, auth_1.authenticateToken, async (req, res) => {
     try {
         const { projectId, collectionId } = req.params;
@@ -340,7 +340,7 @@ app.post("/projects/:projectId/databases/\\(default\\)/documents/:collectionId",
         const now = new Date();
         document.createTime = now;
         document.updateTime = now;
-        console.log(`[CREATE] Inserting document with _name: ${documentId} in ${targetDbName}/${collectionId}`);
+        console.log(`[CREATE] Inserting document with _id: ${documentId} in ${targetDbName}/${collectionId}`);
         const result = await collection.insertOne(document);
         console.log(`[CREATE] Successfully created document ${documentId} in ${targetDbName}/${collectionId}`);
         // Convert to Firestore format for response
@@ -463,7 +463,7 @@ app.get("/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:d
             });
         }
         const { collection } = getDbAndCollection(targetDbName, collectionId);
-        // Build query to find document by _name or _id (for backward compatibility)
+        // Build query to find document by _id or _id (for backward compatibility)
         const query = buildDocumentQuery(documentId);
         const document = await collection.findOne(query);
         if (!document) {
@@ -528,7 +528,7 @@ app.patch("/projects/:projectId/databases/\\(default\\)/documents/:collectionId/
             });
         }
         const { collection } = getDbAndCollection(targetDbName, collectionId);
-        // Build query to find document by _name or _id (for backward compatibility)
+        // Build query to find document by _id or _id (for backward compatibility)
         const query = buildDocumentQuery(documentId);
         // Check if document exists
         const existingDoc = await collection.findOne(query);
@@ -543,7 +543,7 @@ app.patch("/projects/:projectId/databases/\\(default\\)/documents/:collectionId/
         const updateData = convertFromFirestoreFormat(req.body);
         // Remove immutable fields
         delete updateData._id;
-        delete updateData._name;
+        delete updateData._id;
         delete updateData.createTime;
         // Set update timestamp
         updateData.updateTime = new Date();
@@ -576,7 +576,7 @@ app.patch("/projects/:projectId/databases/\\(default\\)/documents/:collectionId/
         });
     }
 });
-// SET - PUT document (create or replace with specific _name ID)
+// SET - PUT document (create or replace with specific _id ID)
 app.put("/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId", checkConnection, auth_1.authenticateToken, async (req, res) => {
     try {
         const { projectId, collectionId, documentId } = req.params;
@@ -618,7 +618,7 @@ app.put("/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:d
         }
         const { collection } = getDbAndCollection(targetDbName, collectionId);
         const document = convertFromFirestoreFormat(req.body);
-        // Build query to find existing document by _name or _id (for backward compatibility)
+        // Build query to find existing document by _id or _id (for backward compatibility)
         const query = buildDocumentQuery(documentId);
         const existingDoc = await collection.findOne(query);
         const now = new Date();
@@ -668,7 +668,7 @@ app.delete("/projects/:projectId/databases/\\(default\\)/documents/:collectionId
             });
         }
         const { collection } = getDbAndCollection(targetDbName, collectionId);
-        // Build query to find document by _name or _id (for backward compatibility)
+        // Build query to find document by _id or _id (for backward compatibility)
         const query = buildDocumentQuery(documentId);
         console.log(`[DELETE] Deleting document ${documentId} from ${targetDbName}/${collectionId}`);
         const result = await collection.deleteOne(query);
@@ -709,7 +709,7 @@ function getRouteSuggestion(method, path) {
         pathParts[0] === "projects" &&
         pathParts[2] === "databases" &&
         pathParts[4] === "documents") {
-        return `To create a document in collection '${pathParts[5]}' of project '${pathParts[1]}' with auto-generated _name, use: POST /projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}`;
+        return `To create a document in collection '${pathParts[5]}' of project '${pathParts[1]}' with auto-generated _id, use: POST /projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}`;
     }
     else if (method === "GET" &&
         pathParts.length === 7 &&
@@ -743,11 +743,11 @@ async function startServer() {
     app.use((req, res) => {
         console.log(`[404] ${req.method} ${req.path} - Route not found`);
         console.log(`[404] Available routes for data operations:`);
-        console.log(`  POST /projects/[projectId]/databases/(default)/documents/[collectionId] - Create document (auto-generated _name)`);
+        console.log(`  POST /projects/[projectId]/databases/(default)/documents/[collectionId] - Create document (auto-generated _id)`);
         console.log(`  GET /projects/[projectId]/databases/(default)/documents/[collectionId] - Get all documents`);
         console.log(`  GET /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Get specific document`);
         console.log(`  PATCH /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Update document`);
-        console.log(`  PUT /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Set document (create or replace with specific _name)`);
+        console.log(`  PUT /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Set document (create or replace with specific _id)`);
         console.log(`  DELETE /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Delete document`);
         console.log(`  GET /projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Get collection metadata`);
         console.log(`  PUT /projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Update collection metadata`);
@@ -757,10 +757,10 @@ async function startServer() {
             path: req.path,
             suggestion: getRouteSuggestion(req.method, req.path),
             availableRoutes: {
-                create: "POST /projects/:projectId/databases/(default)/documents/:collectionId (auto-generated _name)",
+                create: "POST /projects/:projectId/databases/(default)/documents/:collectionId (auto-generated _id)",
                 read: "GET /projects/:projectId/databases/(default)/documents/:collectionId or GET /projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
                 update: "PATCH /projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
-                set: "PUT /projects/:projectId/databases/(default)/documents/:collectionId/:documentId (create or replace with specific _name)",
+                set: "PUT /projects/:projectId/databases/(default)/documents/:collectionId/:documentId (create or replace with specific _id)",
                 delete: "DELETE /projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
                 metadata: "GET/PUT /projects/:projectId/databases/(default)/documents/:collectionId/_security",
                 auth: "POST /requestCode, POST /verifyCode",

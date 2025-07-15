@@ -46,7 +46,7 @@ Body: {
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "name": "users/user_name_id",
+    "name": "users/user_id_id",
     "fields": {
       "name": { "stringValue": "your_username" },
       "phone": { "stringValue": "+1234567890" },
@@ -55,11 +55,11 @@ Body: {
     }
   },
   "project": {
-    "name": "projects/project_name_id",
+    "name": "projects/project_id_id",
     "fields": {
       "displayName": { "stringValue": "My Project" },
       "description": { "stringValue": "Project description" },
-      "ownerId": { "stringValue": "user_name_id" },
+      "ownerId": { "stringValue": "user_id_id" },
       "createdAt": { "timestampValue": "2024-01-01T00:00:00.000Z" },
       "updatedAt": { "timestampValue": "2024-01-01T00:00:00.000Z" }
     }
@@ -104,7 +104,7 @@ Body: {
 }
 ```
 
-**Note:** POST creates documents with auto-generated `_name` IDs (72-bit base64 strings). To create or replace a document with a specific ID, use the PUT endpoint instead.
+**Note:** POST creates documents with auto-generated `_id` IDs (72-bit base64 strings). To create or replace a document with a specific ID, use the PUT endpoint instead.
 
 ### READ - GET
 
@@ -167,8 +167,8 @@ Each collection has metadata stored in the `collections` collection with the fol
 
 ```json
 {
-  "projectName": "project_database_name",
-  "collectionName": "collection_name",
+  "projectName": "project_database_id",
+  "collectionName": "collection_id",
   "rules": [
     {
       "match": "/documents/{document}",
@@ -248,7 +248,7 @@ Body: {
 #### Update Both Rules and Indexes
 
 ```
-PUT http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/_security
+PUT http://localhost:3000/PROJECT_id/COLLECTION_id/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -283,7 +283,7 @@ BaseBase supports MongoDB-like indexes that can be defined for each collection. 
 
 - **unique**: `{ "unique": true }` - Ensures field values are unique
 - **sparse**: `{ "sparse": true }` - Only indexes documents that contain the indexed field
-- **name**: `{ "name": "custom_index_name" }` - Custom name for the index
+- **name**: `{ "name": "custom_index_id" }` - Custom name for the index
 - **background**: `{ "background": true }` - Creates index in background (future support)
 
 #### Examples
@@ -366,7 +366,7 @@ Where:
 
 - `PROJECT_ID` can be either the display name or database name
 - `COLLECTION_ID` maps to MongoDB collection name
-- `DOCUMENT_ID` maps to document `_name` field (or `_id` for backward compatibility)
+- `DOCUMENT_ID` maps to document `_id` field (or `_id` for backward compatibility)
 - `(default)` is the literal string used by Firebase Firestore for the default database
 
 Examples:
