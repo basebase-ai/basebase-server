@@ -295,8 +295,12 @@ async function requestCodeHandler(req, res, mongoClient) {
 async function verifyCodeHandler(req, res, mongoClient) {
   try {
     const { phone, code, projectApiKey } = req.body;
+    
+    console.log("=== VERIFY CODE DEBUG ===");
+    console.log("Request body:", { phone, code: code ? "[REDACTED]" : undefined, projectApiKey: projectApiKey ? "[REDACTED]" : undefined });
 
     if (!phone || !code || !projectApiKey) {
+      console.log("Missing required fields:", { hasPhone: !!phone, hasCode: !!code, hasProjectApiKey: !!projectApiKey });
       return res
         .status(400)
         .json({ error: "Phone, code, and projectApiKey are required" });
@@ -304,15 +308,31 @@ async function verifyCodeHandler(req, res, mongoClient) {
 
     // Phone validation - enforce strict +1234567890 format
     if (!validatePhoneFormat(phone)) {
+      console.log("Invalid phone format:", phone);
       return res.status(400).json({
         error:
           "Invalid phone number format. Phone must be in format +1234567890 (+ followed by 10-15 digits only)",
       });
     }
+    
+    console.log("Phone format valid:", phone);
+
+    // Check what codes exist for this phone
+    const codesCollection = mongoClient.db("basebase").collection("verification_codes");
+    const allCodesForPhone = await codesCollection.find({ phone }).toArray();
+    console.log("All codes for phone:", allCodesForPhone.map(c => ({ 
+      code: c.code, 
+      expiresAt: c.expiresAt, 
+      isExpired: c.expiresAt <= new Date(),
+      createdAt: c.createdAt 
+    })));
 
     // Verify the code
     const isValidCode = await verifyCode(mongoClient, phone, code);
+    console.log("Code verification result:", isValidCode);
+    
     if (!isValidCode) {
+      console.log("Code verification failed for phone:", phone, "code:", code);
       return res
         .status(400)
         .json({ error: "Invalid or expired verification code" });
@@ -320,7 +340,10 @@ async function verifyCodeHandler(req, res, mongoClient) {
 
     // Verify project API key
     const project = await verifyProjectApiKey(mongoClient, projectApiKey);
+    console.log("Project verification result:", project ? "found" : "not found");
+    
     if (!project) {
+      console.log("Invalid project API key");
       return res.status(400).json({ error: "Invalid project API key" });
     }
 
@@ -329,11 +352,16 @@ async function verifyCodeHandler(req, res, mongoClient) {
       .db("basebase")
       .collection("users")
       .findOne({ phone });
+    console.log("User lookup result:", user ? "found" : "not found");
+    
     if (!user) {
+      console.log("User not found for phone:", phone);
       return res.status(404).json({ error: "User not found" });
     }
 
     // Generate JWT token
+    console.log("Generating JWT token for user:", user._name, "project:", project._name);
+    
     const token = jwt.sign(
       {
         userId: user._name,
@@ -344,6 +372,9 @@ async function verifyCodeHandler(req, res, mongoClient) {
       { expiresIn: "1y" }
     );
 
+    console.log("JWT token generated successfully");
+    console.log("=== VERIFY CODE SUCCESS ===");
+
     res.json({
       token,
       user: {
@@ -351,8 +382,8 @@ async function verifyCodeHandler(req, res, mongoClient) {
         fields: {
           name: { stringValue: user.name },
           phone: { stringValue: user.phone },
-          createdAt: { timestampValue: user.createdAt.toISOString() },
-          updatedAt: { timestampValue: user.updatedAt.toISOString() }
+          createdAt: { timestampValue: user.createdAt ? user.createdAt.toISOString() : new Date().toISOString() },
+          updatedAt: { timestampValue: user.updatedAt ? user.updatedAt.toISOString() : new Date().toISOString() }
         }
       },
       project: {
@@ -361,13 +392,14 @@ async function verifyCodeHandler(req, res, mongoClient) {
           displayName: { stringValue: project.displayName },
           description: { stringValue: project.description || "" },
           ownerId: { stringValue: project.ownerId },
-          createdAt: { timestampValue: project.createdAt.toISOString() },
-          updatedAt: { timestampValue: project.updatedAt.toISOString() }
+          createdAt: { timestampValue: project.createdAt ? project.createdAt.toISOString() : new Date().toISOString() },
+          updatedAt: { timestampValue: project.updatedAt ? project.updatedAt.toISOString() : new Date().toISOString() }
         }
       },
     });
   } catch (error) {
     console.error("Verify code error:", error);
+    console.log("=== VERIFY CODE ERROR ===");
     res.status(500).json({ error: "Failed to verify code" });
   }
 }
