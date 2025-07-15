@@ -94,7 +94,7 @@ Project names are automatically sanitized to ensure MongoDB database compatibili
 Add document with auto-generated ID:
 
 ```
-POST http://localhost:3000/PROJECT_NAME/COLLECTION_NAME
+POST http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
 
 Body: {
   "fields": {
@@ -111,13 +111,13 @@ Body: {
 Get single document:
 
 ```
-GET http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/DOCUMENT_ID
+GET http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 ```
 
 Get collection:
 
 ```
-GET http://localhost:3000/PROJECT_NAME/COLLECTION_NAME
+GET http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
 ```
 
 ### UPDATE - PATCH
@@ -125,7 +125,7 @@ GET http://localhost:3000/PROJECT_NAME/COLLECTION_NAME
 Update specific fields:
 
 ```
-PATCH http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/DOCUMENT_ID
+PATCH http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 
 Body: {
   "fields": {
@@ -139,7 +139,7 @@ Body: {
 Create or replace document with specific ID:
 
 ```
-PUT http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/DOCUMENT_ID
+PUT http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 
 Body: {
   "fields": {
@@ -154,7 +154,7 @@ Body: {
 ### DELETE - DELETE
 
 ```
-DELETE http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/DOCUMENT_ID
+DELETE http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 ```
 
 ## Security Rules
@@ -200,14 +200,14 @@ Each collection has metadata stored in the `collections` collection with the fol
 #### Get Collection Metadata (Security Rules & Indexes)
 
 ```
-GET http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/_security
+GET http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 ```
 
 #### Update Security Rules
 
 ```
-PUT http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/_security
+PUT http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -224,7 +224,7 @@ Body: {
 #### Update Indexes
 
 ```
-PUT http://localhost:3000/PROJECT_NAME/COLLECTION_NAME/_security
+PUT http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -357,16 +357,22 @@ Authorization: Bearer JWT_TOKEN
 
 ## Path Structure
 
-The API uses a simple path structure:
+The API uses Firebase-style path structure to match the Firestore REST API exactly:
 
-- `PROJECT_NAME` can be either the display name or database name
-- `COLLECTION_NAME` maps to MongoDB collection name
+- `/projects/{PROJECT_ID}/databases/(default)/documents/{COLLECTION_ID}` for collection operations
+- `/projects/{PROJECT_ID}/databases/(default)/documents/{COLLECTION_ID}/{DOCUMENT_ID}` for document operations
+
+Where:
+
+- `PROJECT_ID` can be either the display name or database name
+- `COLLECTION_ID` maps to MongoDB collection name
 - `DOCUMENT_ID` maps to document `_name` field (or `_id` for backward compatibility)
+- `(default)` is the literal string used by Firebase Firestore for the default database
 
 Examples:
 
-- `POST /my-awesome-project/users` (display name)
-- `POST /my_awesome_project/users` (database name)
+- `POST /projects/my-awesome-project/databases/(default)/documents/users` (display name)
+- `POST /projects/my_awesome_project/databases/(default)/documents/users` (database name)
   Both resolve to the same `my_awesome_project` database
 
 ## Data Format

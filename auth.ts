@@ -1,31 +1,89 @@
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const twilio = require("twilio");
+import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import twilio from "twilio";
+import { Express, Request, Response, NextFunction } from "express";
+import { MongoClient, ObjectId } from "mongodb";
 
-// Helper function to generate 72-bit base64 _name ID (same as server.js)
-function generateName() {
+interface AuthenticatedRequest extends Request {
+  user?: {
+    userId: string;
+    projectId: string;
+    projectName: string;
+  };
+}
+
+interface User {
+  _id: string;
+  name: string;
+  phone: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface Project {
+  _id: string;
+  displayName: string;
+  description: string;
+  ownerId: string;
+  apiKey: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface VerificationCode {
+  _id?: ObjectId;
+  phone: string;
+  code: string;
+  expiresAt: Date;
+  createdAt: Date;
+}
+
+interface FirestoreProject {
+  name: string;
+  fields: {
+    displayName: { stringValue: string };
+    description: { stringValue: string };
+    ownerId: { stringValue: string };
+    createdAt: { timestampValue: string };
+    updatedAt: { timestampValue: string };
+    name?: { stringValue: string };
+  };
+}
+
+interface FirestoreUser {
+  name: string;
+  fields: {
+    name: { stringValue: string };
+    phone: { stringValue: string };
+    createdAt: { timestampValue: string };
+    updatedAt: { timestampValue: string };
+  };
+}
+
+// Helper function to generate 72-bit base64 _name ID (same as server.ts)
+function generateName(): string {
   // Generate 9 bytes (72 bits) of random data
   const randomBytes = crypto.randomBytes(9);
   // Convert to base64 and make URL-safe
-  return randomBytes.toString('base64url');
+  return randomBytes.toString("base64url");
 }
 
 // Initialize Twilio client
 const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
+  process.env.TWILIO_ACCOUNT_SID!,
+  process.env.TWILIO_AUTH_TOKEN!
 );
 
 const JWT_SECRET =
   process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 // Helper function to generate secure API key
-function generateApiKey() {
+function generateApiKey(): string {
   return "bb_" + crypto.randomBytes(32).toString("hex");
 }
 
 // Helper function to sanitize project name for MongoDB database name
-function sanitizeProjectName(name) {
+function sanitizeProjectName(name: string): string {
   if (!name || typeof name !== "string") {
     throw new Error("Project name must be a non-empty string");
   }
@@ -62,7 +120,11 @@ function sanitizeProjectName(name) {
 }
 
 // Helper function to ensure unique project name
-async function ensureUniqueProjectName(mongoClient, baseName, userId) {
+async function ensureUniqueProjectName(
+  mongoClient: MongoClient,
+  baseName: string,
+  userId: string
+): Promise<string> {
   const projectsCollection = mongoClient.db("basebase").collection("projects");
 
   let uniqueName = baseName;
@@ -90,87 +152,101 @@ async function ensureUniqueProjectName(mongoClient, baseName, userId) {
 }
 
 // JWT Authentication middleware
-function authenticateToken(req, res, next) {
+function authenticateToken(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1]; // Bearer TOKEN
 
   if (!token) {
-    return res.status(401).json({ error: "Access token required" });
+    res.status(401).json({ error: "Access token required" });
+    return;
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({ error: "Invalid or expired token" });
+      res.status(403).json({ error: "Invalid or expired token" });
+      return;
     }
-    req.user = user; // Contains userId, projectId, projectName, phone
+    req.user = user as any; // Contains userId, projectId, projectName, phone
     next();
   });
 }
 
 // Helper function to validate phone number format
-function validatePhoneFormat(phone) {
+function validatePhoneFormat(phone: string): boolean {
   // Enforce strict +1234567890 format: + followed by 10-15 digits only
   const phoneRegex = /^\+\d{10,15}$/;
   return phoneRegex.test(phone);
 }
 
 // Helper function to generate verification code
-function generateVerificationCode() {
+function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
 }
 
 // Helper function to get or create user
-async function getOrCreateUser(mongoClient, name, phone) {
+async function getOrCreateUser(
+  mongoClient: MongoClient,
+  name: string,
+  phone: string
+): Promise<User> {
   const usersCollection = mongoClient.db("basebase").collection("users");
 
-  // Create unique index on _name if it doesn't exist
-  try {
-    await usersCollection.createIndex({ _name: 1 }, { unique: true });
-  } catch (indexError) {
-    // Index might already exist, that's fine
-    console.log("Users _name index creation info:", indexError.message);
-  }
+  // Create unique index on _id (already exists by default)
 
   // Check if user already exists
-  let user = await usersCollection.findOne({ phone });
+  let user = (await usersCollection.findOne({ phone })) as User | null;
 
   if (!user) {
-    // Generate unique _name for user
-    let userName;
+    // Generate unique _id for user
+    let userId: string;
     const maxAttempts = 10;
-    
+
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      userName = generateName();
-      
-      // Check if _name already exists
-      const existingUser = await usersCollection.findOne({ _name: userName });
+      userId = generateName();
+
+      // Check if _id already exists
+      const existingUser = await usersCollection.findOne({
+        _id: userId,
+      } as any);
       if (!existingUser) {
         break;
       }
-      
+
       if (attempt === maxAttempts - 1) {
-        throw new Error("Failed to generate unique _name for user after multiple attempts");
+        throw new Error(
+          "Failed to generate unique _id for user after multiple attempts"
+        );
       }
     }
 
     // Create new user
-    const newUser = {
-      _name: userName,
+    const newUser: any = {
+      _id: userId!,
       name,
       phone,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
-    const result = await usersCollection.insertOne(newUser);
-    user = await usersCollection.findOne({ _name: newUser._name });
+    await usersCollection.insertOne(newUser);
+    user = (await usersCollection.findOne({
+      _id: newUser._id,
+    } as any)) as User | null;
   }
 
-  return user;
+  return user!;
 }
 
 // Helper function to store verification code
-async function storeVerificationCode(mongoClient, phone, code) {
+async function storeVerificationCode(
+  mongoClient: MongoClient,
+  phone: string,
+  code: string
+): Promise<void> {
   const codesCollection = mongoClient
     .db("basebase")
     .collection("verification_codes");
@@ -189,20 +265,24 @@ async function storeVerificationCode(mongoClient, phone, code) {
 }
 
 // Helper function to verify code
-async function verifyCode(mongoClient, phone, code) {
+async function verifyCode(
+  mongoClient: MongoClient,
+  phone: string,
+  code: string
+): Promise<boolean> {
   const codesCollection = mongoClient
     .db("basebase")
     .collection("verification_codes");
 
-  const storedCode = await codesCollection.findOne({
+  const storedCode = (await codesCollection.findOne({
     phone,
     code,
     expiresAt: { $gt: new Date() },
-  });
+  })) as VerificationCode | null;
 
   if (storedCode) {
     // Clean up used code
-    await codesCollection.deleteOne({ _id: storedCode._id });
+    await codesCollection.deleteOne({ _id: storedCode._id! });
     return true;
   }
 
@@ -210,19 +290,27 @@ async function verifyCode(mongoClient, phone, code) {
 }
 
 // Helper function to verify project API key
-async function verifyProjectApiKey(mongoClient, projectApiKey) {
+async function verifyProjectApiKey(
+  mongoClient: MongoClient,
+  projectApiKey: string
+): Promise<Project | null> {
   const projectsCollection = mongoClient.db("basebase").collection("projects");
 
-  const project = await projectsCollection.findOne({ apiKey: projectApiKey });
+  const project = (await projectsCollection.findOne({
+    apiKey: projectApiKey,
+  })) as unknown as Project | null;
   return project;
 }
 
 // Helper function to send SMS via Twilio
-async function sendSMS(phone, message) {
+async function sendSMS(
+  phone: string,
+  message: string
+): Promise<{ success: boolean; messageId: string }> {
   try {
     const result = await twilioClient.messages.create({
       body: message,
-      from: process.env.TWILIO_PHONE_NUMBER,
+      from: process.env.TWILIO_PHONE_NUMBER!,
       to: phone,
     });
 
@@ -232,25 +320,31 @@ async function sendSMS(phone, message) {
     return { success: true, messageId: result.sid };
   } catch (error) {
     console.error("Twilio SMS error:", error);
-    throw new Error(`Failed to send SMS: ${error.message}`);
+    throw new Error(`Failed to send SMS: ${(error as Error).message}`);
   }
 }
 
 // Request verification code endpoint
-async function requestCodeHandler(req, res, mongoClient) {
+async function requestCodeHandler(
+  req: Request,
+  res: Response,
+  mongoClient: MongoClient
+): Promise<void> {
   try {
     const { name, phone } = req.body;
 
     if (!name || !phone) {
-      return res.status(400).json({ error: "Name and phone are required" });
+      res.status(400).json({ error: "Name and phone are required" });
+      return;
     }
 
     // Phone validation - enforce strict +1234567890 format
     if (!validatePhoneFormat(phone)) {
-      return res.status(400).json({
+      res.status(400).json({
         error:
           "Invalid phone number format. Phone must be in format +1234567890 (+ followed by 10-15 digits only)",
       });
+      return;
     }
 
     // Create or get user
@@ -270,7 +364,7 @@ async function requestCodeHandler(req, res, mongoClient) {
 
       res.json({
         message: "Verification code sent via SMS",
-        userId: user._id.toString(),
+        userId: user._id?.toString(),
       });
     } catch (smsError) {
       console.error("SMS sending failed:", smsError);
@@ -292,81 +386,109 @@ async function requestCodeHandler(req, res, mongoClient) {
 }
 
 // Verify code and get JWT endpoint
-async function verifyCodeHandler(req, res, mongoClient) {
+async function verifyCodeHandler(
+  req: Request,
+  res: Response,
+  mongoClient: MongoClient
+): Promise<void> {
   try {
     const { phone, code, projectApiKey } = req.body;
-    
+
     console.log("=== VERIFY CODE DEBUG ===");
-    console.log("Request body:", { phone, code: code ? "[REDACTED]" : undefined, projectApiKey: projectApiKey ? "[REDACTED]" : undefined });
+    console.log("Request body:", {
+      phone,
+      code: code ? "[REDACTED]" : undefined,
+      projectApiKey: projectApiKey ? "[REDACTED]" : undefined,
+    });
 
     if (!phone || !code || !projectApiKey) {
-      console.log("Missing required fields:", { hasPhone: !!phone, hasCode: !!code, hasProjectApiKey: !!projectApiKey });
-      return res
+      console.log("Missing required fields:", {
+        hasPhone: !!phone,
+        hasCode: !!code,
+        hasProjectApiKey: !!projectApiKey,
+      });
+      res
         .status(400)
         .json({ error: "Phone, code, and projectApiKey are required" });
+      return;
     }
 
     // Phone validation - enforce strict +1234567890 format
     if (!validatePhoneFormat(phone)) {
       console.log("Invalid phone format:", phone);
-      return res.status(400).json({
+      res.status(400).json({
         error:
           "Invalid phone number format. Phone must be in format +1234567890 (+ followed by 10-15 digits only)",
       });
+      return;
     }
-    
+
     console.log("Phone format valid:", phone);
 
     // Check what codes exist for this phone
-    const codesCollection = mongoClient.db("basebase").collection("verification_codes");
+    const codesCollection = mongoClient
+      .db("basebase")
+      .collection("verification_codes");
     const allCodesForPhone = await codesCollection.find({ phone }).toArray();
-    console.log("All codes for phone:", allCodesForPhone.map(c => ({ 
-      code: c.code, 
-      expiresAt: c.expiresAt, 
-      isExpired: c.expiresAt <= new Date(),
-      createdAt: c.createdAt 
-    })));
+    console.log(
+      "All codes for phone:",
+      allCodesForPhone.map((c) => ({
+        code: c.code,
+        expiresAt: c.expiresAt,
+        isExpired: c.expiresAt <= new Date(),
+        createdAt: c.createdAt,
+      }))
+    );
 
     // Verify the code
     const isValidCode = await verifyCode(mongoClient, phone, code);
     console.log("Code verification result:", isValidCode);
-    
+
     if (!isValidCode) {
       console.log("Code verification failed for phone:", phone, "code:", code);
-      return res
-        .status(400)
-        .json({ error: "Invalid or expired verification code" });
+      res.status(400).json({ error: "Invalid or expired verification code" });
+      return;
     }
 
     // Verify project API key
     const project = await verifyProjectApiKey(mongoClient, projectApiKey);
-    console.log("Project verification result:", project ? "found" : "not found");
-    
+    console.log(
+      "Project verification result:",
+      project ? "found" : "not found"
+    );
+
     if (!project) {
       console.log("Invalid project API key");
-      return res.status(400).json({ error: "Invalid project API key" });
+      res.status(400).json({ error: "Invalid project API key" });
+      return;
     }
 
     // Get user
-    const user = await mongoClient
+    const user = (await mongoClient
       .db("basebase")
       .collection("users")
-      .findOne({ phone });
+      .findOne({ phone })) as User | null;
     console.log("User lookup result:", user ? "found" : "not found");
-    
+
     if (!user) {
       console.log("User not found for phone:", phone);
-      return res.status(404).json({ error: "User not found" });
+      res.status(404).json({ error: "User not found" });
+      return;
     }
 
     // Generate JWT token
-    console.log("Generating JWT token for user:", user._name, "project:", project._name);
-    
+    console.log(
+      "Generating JWT token for user:",
+      user._id,
+      "project:",
+      project._id
+    );
+
     const token = jwt.sign(
       {
-        userId: user._name,
-        projectId: project._name,
-        projectName: project._name,
+        userId: user._id,
+        projectId: project._id,
+        projectName: project._id,
       },
       JWT_SECRET,
       { expiresIn: "1y" }
@@ -378,24 +500,40 @@ async function verifyCodeHandler(req, res, mongoClient) {
     res.json({
       token,
       user: {
-        name: `users/${user._name}`,
+        name: `users/${user._id}`,
         fields: {
           name: { stringValue: user.name },
           phone: { stringValue: user.phone },
-          createdAt: { timestampValue: user.createdAt ? user.createdAt.toISOString() : new Date().toISOString() },
-          updatedAt: { timestampValue: user.updatedAt ? user.updatedAt.toISOString() : new Date().toISOString() }
-        }
-      },
+          createdAt: {
+            timestampValue: user.createdAt
+              ? user.createdAt.toISOString()
+              : new Date().toISOString(),
+          },
+          updatedAt: {
+            timestampValue: user.updatedAt
+              ? user.updatedAt.toISOString()
+              : new Date().toISOString(),
+          },
+        },
+      } as FirestoreUser,
       project: {
-        name: `projects/${project._name}`,
+        name: `projects/${project._id}`,
         fields: {
           displayName: { stringValue: project.displayName },
           description: { stringValue: project.description || "" },
           ownerId: { stringValue: project.ownerId },
-          createdAt: { timestampValue: project.createdAt ? project.createdAt.toISOString() : new Date().toISOString() },
-          updatedAt: { timestampValue: project.updatedAt ? project.updatedAt.toISOString() : new Date().toISOString() }
-        }
-      },
+          createdAt: {
+            timestampValue: project.createdAt
+              ? project.createdAt.toISOString()
+              : new Date().toISOString(),
+          },
+          updatedAt: {
+            timestampValue: project.updatedAt
+              ? project.updatedAt.toISOString()
+              : new Date().toISOString(),
+          },
+        },
+      } as FirestoreProject,
     });
   } catch (error) {
     console.error("Verify code error:", error);
@@ -405,23 +543,29 @@ async function verifyCodeHandler(req, res, mongoClient) {
 }
 
 // Create project endpoint
-async function createProjectHandler(req, res, mongoClient) {
+async function createProjectHandler(
+  req: AuthenticatedRequest,
+  res: Response,
+  mongoClient: MongoClient
+): Promise<void> {
   try {
     const { name, description } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     if (!name) {
-      return res.status(400).json({ error: "Project name is required" });
+      res.status(400).json({ error: "Project name is required" });
+      return;
     }
 
     // Sanitize project name
-    let sanitizedName;
+    let sanitizedName: string;
     try {
       sanitizedName = sanitizeProjectName(name);
     } catch (sanitizeError) {
-      return res.status(400).json({
-        error: `Invalid project name: ${sanitizeError.message}`,
+      res.status(400).json({
+        error: `Invalid project name: ${(sanitizeError as Error).message}`,
       });
+      return;
     }
 
     // Ensure unique sanitized name
@@ -432,17 +576,20 @@ async function createProjectHandler(req, res, mongoClient) {
         userId
       );
     } catch (uniqueError) {
-      return res.status(400).json({
-        error: `Unable to create unique project name: ${uniqueError.message}`,
+      res.status(400).json({
+        error: `Unable to create unique project name: ${
+          (uniqueError as Error).message
+        }`,
       });
+      return;
     }
 
     // Generate API key
     const apiKey = generateApiKey();
 
     // Create project
-    const newProject = {
-      _name: sanitizedName, // Use sanitized name as _name for database operations
+    const newProject: Project = {
+      _id: sanitizedName, // Use sanitized name as _name for database operations
       displayName: name.trim(), // Store original name for display
       description: description || "",
       ownerId: userId,
@@ -460,64 +607,71 @@ async function createProjectHandler(req, res, mongoClient) {
       await projectsCollection.createIndex({ _name: 1 }, { unique: true });
     } catch (indexError) {
       // Index might already exist, that's fine
-      console.log("Projects _name index creation info:", indexError.message);
+      console.log(
+        "Projects _name index creation info:",
+        (indexError as Error).message
+      );
     }
 
-    const result = await projectsCollection.insertOne(newProject);
-    const project = await projectsCollection.findOne({
-      _name: newProject._name,
-    });
+    await projectsCollection.insertOne(newProject as any);
+    const project = (await projectsCollection.findOne({
+      _id: newProject._id,
+    } as any)) as unknown as Project;
 
     res.status(201).json({
       project: {
-        name: `projects/${project._name}`,
+        name: `projects/${project._id}`,
         fields: {
           displayName: { stringValue: project.displayName },
           description: { stringValue: project.description || "" },
           ownerId: { stringValue: project.ownerId },
           createdAt: { timestampValue: project.createdAt.toISOString() },
-          updatedAt: { timestampValue: project.updatedAt.toISOString() }
-        }
-      },
+          updatedAt: { timestampValue: project.updatedAt.toISOString() },
+        },
+      } as FirestoreProject,
       apiKey: project.apiKey,
       warning:
         "⚠️  IMPORTANT: Store this API key securely! It cannot be retrieved again.",
-      note: `Database name will be: ${project._name}`,
+      note: `Database name will be: ${project._id}`,
     });
   } catch (error) {
     console.error("Create project error:", error);
-    if (error.code === 11000) {
-      return res.status(400).json({
+    if ((error as any).code === 11000) {
+      res.status(400).json({
         error: "Project name already exists. Please choose a different name.",
       });
+      return;
     }
     res.status(500).json({ error: "Failed to create project" });
   }
 }
 
 // List projects endpoint
-async function listProjectsHandler(req, res, mongoClient) {
+async function listProjectsHandler(
+  req: AuthenticatedRequest,
+  res: Response,
+  mongoClient: MongoClient
+): Promise<void> {
   try {
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const projectsCollection = mongoClient
       .db("basebase")
       .collection("projects");
-    const projects = await projectsCollection
+    const projects = (await projectsCollection
       .find({ ownerId: userId })
       .project({ apiKey: 0 }) // Never return API keys in list
-      .toArray();
+      .toArray()) as Project[];
 
-    const projectList = projects.map((project) => ({
-      name: `projects/${project._name}`,
+    const projectList: FirestoreProject[] = projects.map((project) => ({
+      name: `projects/${project._id}`,
       fields: {
         displayName: { stringValue: project.displayName },
-        name: { stringValue: project.name },
         description: { stringValue: project.description || "" },
         ownerId: { stringValue: project.ownerId },
         createdAt: { timestampValue: project.createdAt.toISOString() },
-        updatedAt: { timestampValue: project.updatedAt.toISOString() }
-      }
+        updatedAt: { timestampValue: project.updatedAt.toISOString() },
+      },
     }));
 
     res.json({
@@ -531,50 +685,52 @@ async function listProjectsHandler(req, res, mongoClient) {
 }
 
 // Regenerate API key endpoint
-async function regenerateApiKeyHandler(req, res, mongoClient) {
+async function regenerateApiKeyHandler(
+  req: AuthenticatedRequest,
+  res: Response,
+  mongoClient: MongoClient
+): Promise<void> {
   try {
     const { projectId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user!.userId;
 
     const projectsCollection = mongoClient
       .db("basebase")
       .collection("projects");
 
     // Check if project exists and user owns it
-    const project = await projectsCollection.findOne({
-      _name: projectId,
+    const project = (await projectsCollection.findOne({
+      _id: projectId,
       ownerId: userId,
-    });
+    } as any)) as unknown as Project | null;
 
     if (!project) {
-      return res.status(404).json({ error: "Project not found" });
+      res.status(404).json({ error: "Project not found" });
+      return;
     }
 
     // Generate new API key
     const newApiKey = generateApiKey();
 
     // Update project with new API key
-    await projectsCollection.updateOne(
-      { _name: project._name },
-      {
-        $set: {
-          apiKey: newApiKey,
-          updatedAt: new Date(),
-        },
-      }
-    );
+    await projectsCollection.updateOne({ _id: project._id } as any, {
+      $set: {
+        apiKey: newApiKey,
+        updatedAt: new Date(),
+      },
+    });
 
     res.json({
       project: {
-        name: `projects/${project._name}`,
+        name: `projects/${project._id}`,
         fields: {
           displayName: { stringValue: project.displayName },
           description: { stringValue: project.description || "" },
           ownerId: { stringValue: project.ownerId },
           createdAt: { timestampValue: project.createdAt.toISOString() },
-          updatedAt: { timestampValue: project.updatedAt.toISOString() }
-        }
-      },
+          updatedAt: { timestampValue: project.updatedAt.toISOString() },
+        },
+      } as FirestoreProject,
       apiKey: newApiKey,
       warning:
         "⚠️  IMPORTANT: Store this API key securely! It cannot be retrieved again.",
@@ -587,43 +743,56 @@ async function regenerateApiKeyHandler(req, res, mongoClient) {
 }
 
 // Setup authentication routes
-function setupAuthRoutes(app, mongoClient, checkConnection) {
+function setupAuthRoutes(
+  app: Express,
+  mongoClient: MongoClient,
+  checkConnection: (req: Request, res: Response, next: NextFunction) => void
+): void {
   // Request verification code
-  app.post("/requestCode", checkConnection, async (req, res) => {
-    await requestCodeHandler(req, res, mongoClient);
-  });
+  app.post(
+    "/requestCode",
+    checkConnection,
+    async (req: Request, res: Response) => {
+      await requestCodeHandler(req, res, mongoClient);
+    }
+  );
 
   // Verify code and get JWT
-  app.post("/verifyCode", checkConnection, async (req, res) => {
-    await verifyCodeHandler(req, res, mongoClient);
-  });
+  app.post(
+    "/verifyCode",
+    checkConnection,
+    async (req: Request, res: Response) => {
+      await verifyCodeHandler(req, res, mongoClient);
+    }
+  );
 
   // Project management routes (require JWT)
   app.post(
     "/projects",
     checkConnection,
     authenticateToken,
-    async (req, res) => {
+    async (req: AuthenticatedRequest, res: Response) => {
       await createProjectHandler(req, res, mongoClient);
     }
   );
 
-  app.get("/projects", checkConnection, authenticateToken, async (req, res) => {
-    await listProjectsHandler(req, res, mongoClient);
-  });
+  app.get(
+    "/projects",
+    checkConnection,
+    authenticateToken,
+    async (req: AuthenticatedRequest, res: Response) => {
+      await listProjectsHandler(req, res, mongoClient);
+    }
+  );
 
   app.post(
     "/projects/:projectId/regenerate-key",
     checkConnection,
     authenticateToken,
-    async (req, res) => {
+    async (req: AuthenticatedRequest, res: Response) => {
       await regenerateApiKeyHandler(req, res, mongoClient);
     }
   );
 }
 
-module.exports = {
-  authenticateToken,
-  setupAuthRoutes,
-  JWT_SECRET,
-};
+export { authenticateToken, setupAuthRoutes, JWT_SECRET };

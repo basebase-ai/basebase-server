@@ -1,37 +1,44 @@
 {
   "name": "basebase-server",
   "version": "1.0.0",
-  "description": "BaseBase Server - API for rapid, scalable storage and retrieval of JSON documents",
-  "main": "server.js",
+  "description": "A simple backend service that provides a Firestore-like API using MongoDB as the underlying database.",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "get-token": "node scripts/get-token.js",
-    "create-project": "node scripts/create-project.js",
-    "setup": "node scripts/setup.js",
-    "manage-security-rules": "node scripts/manage-security-rules.js",
-    "test-index-application": "node scripts/test-index-application.js",
-    "migrate-to-names": "node scripts/migrate-to-names.js",
-    "migrate-dry-run": "node scripts/migrate-to-names.js --dry-run --verbose",
-    "check-indexes": "node scripts/check-indexes.js"
+    "start": "node dist/server.js",
+    "dev": "npx ts-node server.ts",
+    "build": "npx tsc",
+    "test": "jest"
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
     "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.3.0",
-    "twilio": "^5.7.3"
+    "mongodb": "^6.10.0",
+    "twilio": "^5.3.4"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.1",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.1.2",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
   },
   "keywords": [
-    "api",
-    "database",
+    "firestore",
     "mongodb",
-    "rest"
+    "api",
+    "backend"
   ],
   "author": "",
-  "license": "ISC"
+  "license": "MIT"
 }

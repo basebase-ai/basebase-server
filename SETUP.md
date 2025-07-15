@@ -170,7 +170,7 @@ curl -X POST http://localhost:3000/projects/PROJECT_ID/regenerate-key \
 #### Create a document:
 
 ```bash
-curl -X POST http://localhost:3000/myProject/users \
+curl -X POST http://localhost:3000/projects/myProject/databases/\(default\)/documents/users \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -184,14 +184,14 @@ curl -X POST http://localhost:3000/myProject/users \
 #### Read a document:
 
 ```bash
-curl http://localhost:3000/myProject/users/DOCUMENT_ID \
+curl http://localhost:3000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 #### Update a document:
 
 ```bash
-curl -X PATCH http://localhost:3000/myProject/users/DOCUMENT_ID \
+curl -X PATCH http://localhost:3000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -204,14 +204,14 @@ curl -X PATCH http://localhost:3000/myProject/users/DOCUMENT_ID \
 #### Delete a document:
 
 ```bash
-curl -X DELETE http://localhost:3000/myProject/users/DOCUMENT_ID \
+curl -X DELETE http://localhost:3000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 #### Get all documents in a collection:
 
 ```bash
-curl http://localhost:3000/myProject/users \
+curl http://localhost:3000/projects/myProject/databases/\(default\)/documents/users \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -230,16 +230,19 @@ curl http://localhost:3000/myProject/users \
 
 ### CRUD Endpoints (JWT required):
 
-- `POST /projectName/collectionName` - Create document
-- `GET /projectName/collectionName` - Read collection
-- `GET /projectName/collectionName/documentId` - Read single document
-- `PATCH /projectName/collectionName/documentId` - Update document
-- `DELETE /projectName/collectionName/documentId` - Delete document
+- `POST /projects/projectId/databases/(default)/documents/collectionId` - Create document
+- `GET /projects/projectId/databases/(default)/documents/collectionId` - Read collection
+- `GET /projects/projectId/databases/(default)/documents/collectionId/documentId` - Read single document
+- `PATCH /projects/projectId/databases/(default)/documents/collectionId/documentId` - Update document
+- `DELETE /projects/projectId/databases/(default)/documents/collectionId/documentId` - Delete document
+- `GET /projects/projectId/databases/(default)/documents/collectionId/_security` - Get collection metadata
+- `PUT /projects/projectId/databases/(default)/documents/collectionId/_security` - Update collection metadata
 
 Where:
 
-- `projectName` can be either the original project name or sanitized database name
-- `collectionName` maps to MongoDB collection name
+- `projectId` can be either the original project name or sanitized database name
+- `collectionId` maps to MongoDB collection name
+- `(default)` is the literal string used by Firebase Firestore for the default database
 - The system automatically resolves project names to their sanitized database names
 
 ### Internal Collections:
