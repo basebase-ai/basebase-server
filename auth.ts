@@ -584,17 +584,6 @@ async function createProjectHandler(
       .db("basebase")
       .collection("projects");
 
-    // Create unique index on _id if it doesn't exist
-    try {
-      await projectsCollection.createIndex({ _id: 1 }, { unique: true });
-    } catch (indexError) {
-      // Index might already exist, that's fine
-      console.log(
-        "Projects _id index creation info:",
-        (indexError as Error).message
-      );
-    }
-
     await projectsCollection.insertOne(newProject as any);
     const project = (await projectsCollection.findOne({
       _id: newProject._id,
