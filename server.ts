@@ -547,8 +547,8 @@ app.post(
 
       // Set timestamps
       const now = new Date();
-      document.createTime = now;
-      document.updateTime = now;
+      document.createdAt = now;
+      document.updatedAt = now;
 
       console.log(
         `[CREATE] Inserting document with _id: ${documentId} in ${targetDbName}/${collectionId}`
