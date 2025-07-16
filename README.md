@@ -195,17 +195,18 @@ Content-Type: application/json
 
 ### Supported Operators
 
-| Operator                | Description                             | Example                         |
-| ----------------------- | --------------------------------------- | ------------------------------- |
-| `EQUAL`                 | Field equals value                      | `"op": "EQUAL"`                 |
-| `NOT_EQUAL`             | Field does not equal value              | `"op": "NOT_EQUAL"`             |
-| `LESS_THAN`             | Field is less than value                | `"op": "LESS_THAN"`             |
-| `LESS_THAN_OR_EQUAL`    | Field is less than or equal to value    | `"op": "LESS_THAN_OR_EQUAL"`    |
-| `GREATER_THAN`          | Field is greater than value             | `"op": "GREATER_THAN"`          |
-| `GREATER_THAN_OR_EQUAL` | Field is greater than or equal to value | `"op": "GREATER_THAN_OR_EQUAL"` |
-| `ARRAY_CONTAINS`        | Array field contains value              | `"op": "ARRAY_CONTAINS"`        |
-| `IN`                    | Field value is in array                 | `"op": "IN"`                    |
-| `NOT_IN`                | Field value is not in array             | `"op": "NOT_IN"`                |
+| Operator                | Description                                  | Example                         |
+| ----------------------- | -------------------------------------------- | ------------------------------- |
+| `EQUAL`                 | Field equals value                           | `"op": "EQUAL"`                 |
+| `NOT_EQUAL`             | Field does not equal value                   | `"op": "NOT_EQUAL"`             |
+| `LESS_THAN`             | Field is less than value                     | `"op": "LESS_THAN"`             |
+| `LESS_THAN_OR_EQUAL`    | Field is less than or equal to value         | `"op": "LESS_THAN_OR_EQUAL"`    |
+| `GREATER_THAN`          | Field is greater than value                  | `"op": "GREATER_THAN"`          |
+| `GREATER_THAN_OR_EQUAL` | Field is greater than or equal to value      | `"op": "GREATER_THAN_OR_EQUAL"` |
+| `ARRAY_CONTAINS`        | Array field contains value                   | `"op": "ARRAY_CONTAINS"`        |
+| `IN`                    | Field value is in array                      | `"op": "IN"`                    |
+| `NOT_IN`                | Field value is not in array                  | `"op": "NOT_IN"`                |
+| `MATCHES`               | Field text contains value (case-insensitive) | `"op": "MATCHES"`               |
 
 ### Value Types
 

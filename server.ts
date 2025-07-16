@@ -843,6 +843,8 @@ function convertFieldFilter(fieldFilter: any): any {
         return { [fieldPath]: { $nin: notInValues } };
       }
       return { [fieldPath]: { $nin: [] } };
+    case "MATCHES":
+      return { [fieldPath]: { $regex: new RegExp(mongoValue, "i") } };
     default:
       throw new Error(`Unsupported filter operator: ${op}`);
   }

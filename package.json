@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "npx ts-node server.ts",
-    "build": "npx tsc",
-    "test": "jest"
+    "build": "tsc",
+    "test": "npm run build && jest --runInBand --detectOpenHandles --forceExit"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -864,6 +864,55 @@ describe("API Integration Tests", () => {
       expect(timestamps).toEqual([1700000200, 1700000100]);
     });
 
+    test("should query documents with MATCHES operator for text search", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "title" },
+              op: "MATCHES",
+              value: { stringValue: "Breaking" },
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(3);
+      response.body.forEach((result: any) => {
+        expect(result.document.fields.title.stringValue).toContain("Breaking");
+      });
+    });
+
+    test("should return no documents with MATCHES operator if no match", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "title" },
+              op: "MATCHES",
+              value: { stringValue: "NonExistent" },
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(0);
+    });
+
     test("should query documents with comparison operators", async () => {
       const queryData = {
         structuredQuery: {
