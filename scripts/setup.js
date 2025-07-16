@@ -14,7 +14,7 @@
  * Usage: npm run setup-project
  *
  * Requirements:
- * - BaseBase server running on localhost:3000
+ * - BaseBase server running on localhost:8000
  * - MongoDB connection configured
  */
 

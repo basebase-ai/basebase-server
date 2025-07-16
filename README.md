@@ -18,7 +18,7 @@ To authenticate and get a JWT token, follow these steps:
 #### Step 1: Request Verification Code
 
 ```
-POST http://localhost:3000/requestCode
+POST http://localhost:8000/requestCode
 
 Body: {
   "username": "your_username",
@@ -31,7 +31,7 @@ This will send an SMS verification code to the provided phone number and create 
 #### Step 2: Verify Code and Get JWT
 
 ```
-POST http://localhost:3000/verifyCode
+POST http://localhost:8000/verifyCode
 
 Body: {
   "phone": "+1234567890",
@@ -94,7 +94,7 @@ Project names are automatically sanitized to ensure MongoDB database compatibili
 Add document with auto-generated ID:
 
 ```
-POST http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
+POST http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
 
 Body: {
   "fields": {
@@ -111,13 +111,13 @@ Body: {
 Get single document:
 
 ```
-GET http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+GET http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 ```
 
 Get collection:
 
 ```
-GET http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
+GET http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
 ```
 
 ### UPDATE - PATCH
@@ -125,7 +125,7 @@ GET http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLL
 Update specific fields:
 
 ```
-PATCH http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+PATCH http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 
 Body: {
   "fields": {
@@ -139,7 +139,7 @@ Body: {
 Create or replace document with specific ID:
 
 ```
-PUT http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+PUT http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 
 Body: {
   "fields": {
@@ -154,7 +154,191 @@ Body: {
 ### DELETE - DELETE
 
 ```
-DELETE http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+DELETE http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+```
+
+## Query Operations
+
+BaseBase supports Firebase/Firestore-compatible queries using the `:runQuery` endpoint with `structuredQuery` syntax.
+
+### POST `:runQuery` - Query Documents
+
+```
+POST http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents:runQuery
+Authorization: Bearer JWT_TOKEN
+Content-Type: application/json
+```
+
+**Request Body:**
+
+```json
+{
+  "structuredQuery": {
+    "from": [{"collectionId": "COLLECTION_ID"}],
+    "where": {
+      "fieldFilter": {
+        "field": {"fieldPath": "FIELD_NAME"},
+        "op": "OPERATOR",
+        "value": {"TYPE": "VALUE"}
+      }
+    },
+    "orderBy": [
+      {
+        "field": {"fieldPath": "FIELD_NAME"},
+        "direction": "ASCENDING" | "DESCENDING"
+      }
+    ],
+    "limit": 10
+  }
+}
+```
+
+### Supported Operators
+
+| Operator                | Description                             | Example                         |
+| ----------------------- | --------------------------------------- | ------------------------------- |
+| `EQUAL`                 | Field equals value                      | `"op": "EQUAL"`                 |
+| `NOT_EQUAL`             | Field does not equal value              | `"op": "NOT_EQUAL"`             |
+| `LESS_THAN`             | Field is less than value                | `"op": "LESS_THAN"`             |
+| `LESS_THAN_OR_EQUAL`    | Field is less than or equal to value    | `"op": "LESS_THAN_OR_EQUAL"`    |
+| `GREATER_THAN`          | Field is greater than value             | `"op": "GREATER_THAN"`          |
+| `GREATER_THAN_OR_EQUAL` | Field is greater than or equal to value | `"op": "GREATER_THAN_OR_EQUAL"` |
+| `ARRAY_CONTAINS`        | Array field contains value              | `"op": "ARRAY_CONTAINS"`        |
+| `IN`                    | Field value is in array                 | `"op": "IN"`                    |
+| `NOT_IN`                | Field value is not in array             | `"op": "NOT_IN"`                |
+
+### Value Types
+
+| Type                  | Format                              | Example                       |
+| --------------------- | ----------------------------------- | ----------------------------- |
+| String                | `{"stringValue": "text"}`           | `{"stringValue": "John Doe"}` |
+| Integer               | `{"integerValue": "123"}`           | `{"integerValue": "30"}`      |
+| Double                | `{"doubleValue": "123.45"}`         | `{"doubleValue": "99.99"}`    |
+| Boolean               | `{"booleanValue": true}`            | `{"booleanValue": false}`     |
+| Null                  | `{"nullValue": null}`               | `{"nullValue": null}`         |
+| Array (for IN/NOT_IN) | `{"arrayValue": {"values": [...]}}` | See examples below            |
+
+### Query Examples
+
+#### Basic Field Filter
+
+Get documents where `age > 30`:
+
+```json
+{
+  "structuredQuery": {
+    "from": [{ "collectionId": "users" }],
+    "where": {
+      "fieldFilter": {
+        "field": { "fieldPath": "age" },
+        "op": "GREATER_THAN",
+        "value": { "integerValue": "30" }
+      }
+    }
+  }
+}
+```
+
+#### Sorting and Limiting
+
+Get top 10 users sorted by name:
+
+```json
+{
+  "structuredQuery": {
+    "from": [{ "collectionId": "users" }],
+    "orderBy": [
+      {
+        "field": { "fieldPath": "name" },
+        "direction": "ASCENDING"
+      }
+    ],
+    "limit": 10
+  }
+}
+```
+
+#### IN Operator
+
+Get documents where category is "news" or "sports":
+
+```json
+{
+  "structuredQuery": {
+    "from": [{ "collectionId": "articles" }],
+    "where": {
+      "fieldFilter": {
+        "field": { "fieldPath": "category" },
+        "op": "IN",
+        "value": {
+          "arrayValue": {
+            "values": [{ "stringValue": "news" }, { "stringValue": "sports" }]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+#### Composite Filters (AND)
+
+Get recent news articles from specific source:
+
+```json
+{
+  "structuredQuery": {
+    "from": [{ "collectionId": "newsStories" }],
+    "where": {
+      "compositeFilter": {
+        "op": "AND",
+        "filters": [
+          {
+            "fieldFilter": {
+              "field": { "fieldPath": "sourceId" },
+              "op": "EQUAL",
+              "value": { "integerValue": "12345" }
+            }
+          },
+          {
+            "fieldFilter": {
+              "field": { "fieldPath": "timestamp" },
+              "op": "GREATER_THAN",
+              "value": { "integerValue": "1700000000" }
+            }
+          }
+        ]
+      }
+    },
+    "orderBy": [
+      {
+        "field": { "fieldPath": "timestamp" },
+        "direction": "DESCENDING"
+      }
+    ],
+    "limit": 50
+  }
+}
+```
+
+### Response Format
+
+The `:runQuery` endpoint returns an array of documents in Firebase format:
+
+```json
+[
+  {
+    "document": {
+      "name": "projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOC_ID",
+      "fields": {
+        "fieldName": { "stringValue": "value" }
+      },
+      "createTime": "2023-01-01T00:00:00Z",
+      "updateTime": "2023-01-01T00:00:00Z"
+    },
+    "readTime": "2023-01-01T00:00:00Z"
+  }
+]
 ```
 
 ## Security Rules
@@ -200,14 +384,14 @@ Each collection has metadata stored in the `collections` collection with the fol
 #### Get Collection Metadata (Security Rules & Indexes)
 
 ```
-GET http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
+GET http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 ```
 
 #### Update Security Rules
 
 ```
-PUT http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
+PUT http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -224,7 +408,7 @@ Body: {
 #### Update Indexes
 
 ```
-PUT http://localhost:3000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
+PUT http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -248,7 +432,7 @@ Body: {
 #### Update Both Rules and Indexes
 
 ```
-PUT http://localhost:3000/PROJECT_id/COLLECTION_id/_security
+PUT http://localhost:8000/PROJECT_id/COLLECTION_id/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -332,7 +516,7 @@ BaseBase supports MongoDB-like indexes that can be defined for each collection. 
 ### Create Project
 
 ```
-POST http://localhost:3000/projects
+POST http://localhost:8000/projects
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -344,14 +528,14 @@ Body: {
 ### List Projects
 
 ```
-GET http://localhost:3000/projects
+GET http://localhost:8000/projects
 Authorization: Bearer JWT_TOKEN
 ```
 
 ### Regenerate API Key
 
 ```
-POST http://localhost:3000/projects/PROJECT_ID/regenerate-key
+POST http://localhost:8000/projects/PROJECT_ID/regenerate-key
 Authorization: Bearer JWT_TOKEN
 ```
 

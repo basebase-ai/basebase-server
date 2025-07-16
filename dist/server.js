@@ -14,7 +14,7 @@ const cors_1 = __importDefault(require("cors"));
 const auth_1 = require("./auth");
 const app = (0, express_1.default)();
 exports.app = app;
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 // Middleware
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -414,8 +414,8 @@ app.post("/projects/:projectId/databases/\\(default\\)/documents/:collectionId",
         document._id = documentId;
         // Set timestamps
         const now = new Date();
-        document.createTime = now;
-        document.updateTime = now;
+        document.createdAt = now;
+        document.updatedAt = now;
         console.log(`[CREATE] Inserting document with _id: ${documentId} in ${targetDbName}/${collectionId}`);
         const result = await collection.insertOne(document);
         console.log(`[CREATE] Successfully created document ${documentId} in ${targetDbName}/${collectionId}`);
@@ -582,6 +582,192 @@ app.get("/projects/:projectId/databases/\\(default\\)/documents/:collectionId", 
     catch (error) {
         console.error("Read collection error:", error);
         res.status(500).json({ error: "Failed to read collection" });
+    }
+});
+// Helper function to convert Firestore field filter to MongoDB query
+function convertFieldFilter(fieldFilter) {
+    const { field, op, value } = fieldFilter;
+    const fieldPath = field.fieldPath;
+    let mongoValue;
+    if (value.stringValue !== undefined) {
+        mongoValue = value.stringValue;
+    }
+    else if (value.integerValue !== undefined) {
+        mongoValue = parseInt(value.integerValue);
+    }
+    else if (value.doubleValue !== undefined) {
+        mongoValue = parseFloat(value.doubleValue);
+    }
+    else if (value.booleanValue !== undefined) {
+        mongoValue = value.booleanValue;
+    }
+    else if (value.nullValue !== undefined) {
+        mongoValue = null;
+    }
+    else {
+        mongoValue = value;
+    }
+    switch (op) {
+        case "EQUAL":
+            return { [fieldPath]: mongoValue };
+        case "NOT_EQUAL":
+            return { [fieldPath]: { $ne: mongoValue } };
+        case "LESS_THAN":
+            return { [fieldPath]: { $lt: mongoValue } };
+        case "LESS_THAN_OR_EQUAL":
+            return { [fieldPath]: { $lte: mongoValue } };
+        case "GREATER_THAN":
+            return { [fieldPath]: { $gt: mongoValue } };
+        case "GREATER_THAN_OR_EQUAL":
+            return { [fieldPath]: { $gte: mongoValue } };
+        case "ARRAY_CONTAINS":
+            return { [fieldPath]: mongoValue };
+        case "IN":
+            if (value.arrayValue && value.arrayValue.values) {
+                const inValues = value.arrayValue.values.map((v) => {
+                    if (v.stringValue !== undefined)
+                        return v.stringValue;
+                    if (v.integerValue !== undefined)
+                        return parseInt(v.integerValue);
+                    if (v.doubleValue !== undefined)
+                        return parseFloat(v.doubleValue);
+                    if (v.booleanValue !== undefined)
+                        return v.booleanValue;
+                    return v;
+                });
+                return { [fieldPath]: { $in: inValues } };
+            }
+            return { [fieldPath]: { $in: [] } };
+        case "NOT_IN":
+            if (value.arrayValue && value.arrayValue.values) {
+                const notInValues = value.arrayValue.values.map((v) => {
+                    if (v.stringValue !== undefined)
+                        return v.stringValue;
+                    if (v.integerValue !== undefined)
+                        return parseInt(v.integerValue);
+                    if (v.doubleValue !== undefined)
+                        return parseFloat(v.doubleValue);
+                    if (v.booleanValue !== undefined)
+                        return v.booleanValue;
+                    return v;
+                });
+                return { [fieldPath]: { $nin: notInValues } };
+            }
+            return { [fieldPath]: { $nin: [] } };
+        default:
+            throw new Error(`Unsupported filter operator: ${op}`);
+    }
+}
+// Helper function to convert Firestore where clause to MongoDB query
+function convertWhereClause(where) {
+    if (where.fieldFilter) {
+        return convertFieldFilter(where.fieldFilter);
+    }
+    if (where.compositeFilter) {
+        const { op, filters } = where.compositeFilter;
+        const mongoFilters = filters.map((filter) => convertWhereClause(filter));
+        if (op === "AND") {
+            return { $and: mongoFilters };
+        }
+        else if (op === "OR") {
+            return { $or: mongoFilters };
+        }
+        else {
+            throw new Error(`Unsupported composite filter operator: ${op}`);
+        }
+    }
+    throw new Error("Invalid where clause format");
+}
+// Helper function to convert Firestore orderBy to MongoDB sort
+function convertOrderBy(orderBy) {
+    const sort = {};
+    for (const order of orderBy) {
+        const fieldPath = order.field.fieldPath;
+        const direction = order.direction === "DESCENDING" ? -1 : 1;
+        sort[fieldPath] = direction;
+    }
+    return sort;
+}
+// QUERY - POST runQuery (Firebase/Firestore compatible)
+app.post("/projects/:projectId/databases/\\(default\\)/documents:runQuery", checkConnection, auth_1.authenticateToken, async (req, res) => {
+    try {
+        const { projectId } = req.params;
+        const { structuredQuery } = req.body;
+        if (!structuredQuery) {
+            return res.status(400).json({
+                error: "Missing structuredQuery in request body",
+            });
+        }
+        // Resolve the requested project name to database name
+        let targetDbName;
+        try {
+            targetDbName = await resolveProjectDatabaseName(projectId);
+        }
+        catch (resolveError) {
+            return res.status(404).json({ error: resolveError.message });
+        }
+        // Extract collection from the 'from' clause
+        if (!structuredQuery.from || structuredQuery.from.length === 0) {
+            return res.status(400).json({
+                error: "Missing 'from' clause in structuredQuery",
+            });
+        }
+        const collectionId = structuredQuery.from[0].collectionId;
+        if (!collectionId) {
+            return res.status(400).json({
+                error: "Missing 'collectionId' in 'from' clause",
+            });
+        }
+        const { collection } = getDbAndCollection(targetDbName, collectionId);
+        // Build MongoDB query from Firestore where clause
+        let mongoQuery = {};
+        if (structuredQuery.where) {
+            try {
+                mongoQuery = convertWhereClause(structuredQuery.where);
+            }
+            catch (whereError) {
+                return res.status(400).json({
+                    error: `Invalid where clause: ${whereError.message}`,
+                });
+            }
+        }
+        // Build MongoDB sort from Firestore orderBy
+        let mongoSort = {};
+        if (structuredQuery.orderBy && structuredQuery.orderBy.length > 0) {
+            try {
+                mongoSort = convertOrderBy(structuredQuery.orderBy);
+            }
+            catch (sortError) {
+                return res.status(400).json({
+                    error: `Invalid orderBy clause: ${sortError.message}`,
+                });
+            }
+        }
+        // Apply limit if specified
+        let query = collection.find(mongoQuery);
+        if (Object.keys(mongoSort).length > 0) {
+            query = query.sort(mongoSort);
+        }
+        if (structuredQuery.limit) {
+            const limit = parseInt(structuredQuery.limit);
+            if (limit > 0) {
+                query = query.limit(limit);
+            }
+        }
+        const documents = await query.toArray();
+        // Convert to Firebase runQuery response format
+        const response = documents.map((doc) => {
+            const firestoreDoc = convertToFirestoreFormat(doc);
+            return {
+                document: firestoreDoc,
+                readTime: new Date().toISOString(),
+            };
+        });
+        res.json(response);
+    }
+    catch (error) {
+        console.error("Run query error:", error);
+        res.status(500).json({ error: "Failed to execute query" });
     }
 });
 // UPDATE - PATCH document

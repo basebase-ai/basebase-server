@@ -14,7 +14,7 @@
  * Usage: npm run create-project
  *
  * Requirements:
- * - BaseBase server running on localhost:3000
+ * - BaseBase server running on localhost:8000
  * - Valid JWT token (use get-token script first)
  */
 
@@ -89,8 +89,8 @@ async function main() {
 
     // Get server URL (default to localhost)
     const serverUrl =
-      (await prompt("Enter server URL (default: http://localhost:3000): ")) ||
-      "http://localhost:3000";
+      (await prompt("Enter server URL (default: http://localhost:8000): ")) ||
+      "http://localhost:8000";
 
     // Get JWT token
     console.log("🔑 You need a JWT token to create projects.");

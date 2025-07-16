@@ -18,7 +18,7 @@
 
    ```
    MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/
-   PORT=3000
+   PORT=8000
    JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 
    # Twilio SMS Configuration
@@ -76,7 +76,7 @@
 
 9. **Test the server:**
    ```bash
-   curl http://localhost:3000/health
+   curl http://localhost:8000/health
    ```
 
 ## API Usage Examples
@@ -86,7 +86,7 @@
 #### 1. Request verification code:
 
 ```bash
-curl -X POST http://localhost:3000/requestCode \
+curl -X POST http://localhost:8000/requestCode \
   -H "Content-Type: application/json" \
   -d '{
     "username": "John Doe",
@@ -120,7 +120,7 @@ First, create a project document in `basebase.projects` collection:
 #### 3. Verify code and get JWT token:
 
 ```bash
-curl -X POST http://localhost:3000/verifyCode \
+curl -X POST http://localhost:8000/verifyCode \
   -H "Content-Type: application/json" \
   -d '{
     "phone": "+1234567890",
@@ -134,7 +134,7 @@ curl -X POST http://localhost:3000/verifyCode \
 #### Create a project:
 
 ```bash
-curl -X POST http://localhost:3000/projects \
+curl -X POST http://localhost:8000/projects \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -154,14 +154,14 @@ curl -X POST http://localhost:3000/projects \
 #### List your projects:
 
 ```bash
-curl http://localhost:3000/projects \
+curl http://localhost:8000/projects \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 #### Regenerate API key:
 
 ```bash
-curl -X POST http://localhost:3000/projects/PROJECT_ID/regenerate-key \
+curl -X POST http://localhost:8000/projects/PROJECT_ID/regenerate-key \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -170,7 +170,7 @@ curl -X POST http://localhost:3000/projects/PROJECT_ID/regenerate-key \
 #### Create a document:
 
 ```bash
-curl -X POST http://localhost:3000/projects/myProject/databases/\(default\)/documents/users \
+curl -X POST http://localhost:8000/projects/myProject/databases/\(default\)/documents/users \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -184,14 +184,14 @@ curl -X POST http://localhost:3000/projects/myProject/databases/\(default\)/docu
 #### Read a document:
 
 ```bash
-curl http://localhost:3000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
+curl http://localhost:8000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 #### Update a document:
 
 ```bash
-curl -X PATCH http://localhost:3000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
+curl -X PATCH http://localhost:8000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -204,14 +204,14 @@ curl -X PATCH http://localhost:3000/projects/myProject/databases/\(default\)/doc
 #### Delete a document:
 
 ```bash
-curl -X DELETE http://localhost:3000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
+curl -X DELETE http://localhost:8000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 #### Get all documents in a collection:
 
 ```bash
-curl http://localhost:3000/projects/myProject/databases/\(default\)/documents/users \
+curl http://localhost:8000/projects/myProject/databases/\(default\)/documents/users \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

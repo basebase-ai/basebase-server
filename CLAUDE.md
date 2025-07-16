@@ -46,7 +46,7 @@ npm run test-index-application # Test index functionality
 Required `.env` variables:
 
 - `MONGODB_URI`: MongoDB Atlas connection string
-- `PORT`: Server port (default: 3000)
+- `PORT`: Server port (default: 8000)
 - `JWT_SECRET`: Secret for JWT token signing
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`: SMS verification
 

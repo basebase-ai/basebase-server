@@ -10,7 +10,7 @@
  * Usage: npm run get-token
  *
  * Requirements:
- * - BaseBase server running on localhost:3000
+ * - BaseBase server running on localhost:8000
  * - Valid project API key
  * - Phone number capable of receiving SMS
  */
@@ -85,8 +85,8 @@ async function main() {
 
     // Get server URL (default to localhost)
     const serverUrl =
-      (await prompt("Enter server URL (default: http://localhost:3000): ")) ||
-      "http://localhost:3000";
+      (await prompt("Enter server URL (default: http://localhost:8000): ")) ||
+      "http://localhost:8000";
 
     // Get project API key
     console.log("💡 You need a project API key to authenticate.");

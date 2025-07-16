@@ -703,4 +703,369 @@ describe("API Integration Tests", () => {
       ).toHaveLength(0);
     });
   });
+
+  describe("Query Operations (runQuery)", () => {
+    const testProject = "test-project";
+    const testCollection = "newsStories";
+
+    beforeEach(async () => {
+      // Create test documents for querying
+      const testDocuments = [
+        {
+          fields: {
+            sourceId: { integerValue: "12345" },
+            title: { stringValue: "Breaking News 1" },
+            timestamp: { integerValue: "1700000000" },
+            category: { stringValue: "politics" },
+            priority: { integerValue: "1" },
+          },
+        },
+        {
+          fields: {
+            sourceId: { integerValue: "12345" },
+            title: { stringValue: "Breaking News 2" },
+            timestamp: { integerValue: "1700000100" },
+            category: { stringValue: "sports" },
+            priority: { integerValue: "2" },
+          },
+        },
+        {
+          fields: {
+            sourceId: { integerValue: "67890" },
+            title: { stringValue: "Other News" },
+            timestamp: { integerValue: "1700000050" },
+            category: { stringValue: "tech" },
+            priority: { integerValue: "1" },
+          },
+        },
+        {
+          fields: {
+            sourceId: { integerValue: "12345" },
+            title: { stringValue: "Breaking News 3" },
+            timestamp: { integerValue: "1700000200" },
+            category: { stringValue: "politics" },
+            priority: { integerValue: "3" },
+          },
+        },
+      ];
+
+      // Insert test documents
+      for (let i = 0; i < testDocuments.length; i++) {
+        await testHelper
+          .authenticatedRequest(userToken)
+          .put(
+            `/projects/${testProject}/databases/(default)/documents/${testCollection}/doc${
+              i + 1
+            }`
+          )
+          .send(testDocuments[i]);
+      }
+    });
+
+    test("should query documents with field filter (EQUAL)", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "sourceId" },
+              op: "EQUAL",
+              value: { integerValue: "12345" },
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body).toHaveLength(3); // 3 documents with sourceId=12345
+
+      // Verify each result has the expected structure
+      response.body.forEach((result: any) => {
+        expect(result.document).toBeDefined();
+        expect(result.readTime).toBeDefined();
+        expect(result.document.fields.sourceId.integerValue).toBe("12345");
+      });
+    });
+
+    test("should query documents with orderBy (DESCENDING)", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "sourceId" },
+              op: "EQUAL",
+              value: { integerValue: "12345" },
+            },
+          },
+          orderBy: [
+            {
+              field: { fieldPath: "timestamp" },
+              direction: "DESCENDING",
+            },
+          ],
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(3);
+
+      // Verify descending order by timestamp
+      const timestamps = response.body.map((result: any) =>
+        parseInt(result.document.fields.timestamp.integerValue)
+      );
+      expect(timestamps).toEqual([1700000200, 1700000100, 1700000000]);
+    });
+
+    test("should query documents with limit", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "sourceId" },
+              op: "EQUAL",
+              value: { integerValue: "12345" },
+            },
+          },
+          orderBy: [
+            {
+              field: { fieldPath: "timestamp" },
+              direction: "DESCENDING",
+            },
+          ],
+          limit: 2,
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2); // Limited to 2 results
+
+      // Verify we got the most recent 2
+      const timestamps = response.body.map((result: any) =>
+        parseInt(result.document.fields.timestamp.integerValue)
+      );
+      expect(timestamps).toEqual([1700000200, 1700000100]);
+    });
+
+    test("should query documents with comparison operators", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "priority" },
+              op: "GREATER_THAN",
+              value: { integerValue: "1" },
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2); // priority 2 and 3
+
+      response.body.forEach((result: any) => {
+        const priority = parseInt(result.document.fields.priority.integerValue);
+        expect(priority).toBeGreaterThan(1);
+      });
+    });
+
+    test("should query documents with composite filters (AND)", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            compositeFilter: {
+              op: "AND",
+              filters: [
+                {
+                  fieldFilter: {
+                    field: { fieldPath: "sourceId" },
+                    op: "EQUAL",
+                    value: { integerValue: "12345" },
+                  },
+                },
+                {
+                  fieldFilter: {
+                    field: { fieldPath: "category" },
+                    op: "EQUAL",
+                    value: { stringValue: "politics" },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(2); // 2 politics docs with sourceId=12345
+
+      response.body.forEach((result: any) => {
+        expect(result.document.fields.sourceId.integerValue).toBe("12345");
+        expect(result.document.fields.category.stringValue).toBe("politics");
+      });
+    });
+
+    test("should query documents with IN operator", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "category" },
+              op: "IN",
+              value: {
+                arrayValue: {
+                  values: [
+                    { stringValue: "politics" },
+                    { stringValue: "tech" },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(3); // 2 politics + 1 tech
+
+      response.body.forEach((result: any) => {
+        const category = result.document.fields.category.stringValue;
+        expect(["politics", "tech"]).toContain(category);
+      });
+    });
+
+    test("should return empty array for no matches", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "sourceId" },
+              op: "EQUAL",
+              value: { integerValue: "99999" },
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body).toHaveLength(0);
+    });
+
+    test("should return 400 for missing structuredQuery", async () => {
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe(
+        "Missing structuredQuery in request body"
+      );
+    });
+
+    test("should return 400 for missing from clause", async () => {
+      const queryData = {
+        structuredQuery: {
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "sourceId" },
+              op: "EQUAL",
+              value: { integerValue: "12345" },
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe(
+        "Missing 'from' clause in structuredQuery"
+      );
+    });
+
+    test("should return 400 for unsupported filter operator", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "sourceId" },
+              op: "UNSUPPORTED_OPERATOR",
+              value: { integerValue: "12345" },
+            },
+          },
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toContain("Invalid where clause:");
+    });
+
+    test("should query all documents without where clause", async () => {
+      const queryData = {
+        structuredQuery: {
+          from: [{ collectionId: testCollection }],
+        },
+      };
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .send(queryData);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveLength(4); // All 4 test documents
+    });
+  });
 });

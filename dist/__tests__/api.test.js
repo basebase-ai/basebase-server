@@ -333,4 +333,522 @@ describe("API Integration Tests", () => {
             expect(response.body.error).toBe("Invalid document ID");
         });
     });
+    describe("Firebase Array Format Conversion", () => {
+        const testProject = "test-project";
+        const testCollection = "array-test";
+        test("should convert Firebase arrayValue to JavaScript array on creation", async () => {
+            const documentData = {
+                fields: {
+                    sourceIds: {
+                        arrayValue: {
+                            values: [
+                                { stringValue: "6866ef5247046c6267ad35bb" },
+                                { stringValue: "685d9e632efa0f2fbc8f4261" },
+                                { stringValue: "68012d04af809cb7c12f6233" },
+                            ],
+                        },
+                    },
+                    friends: { arrayValue: { values: [] } },
+                    denseMode: { booleanValue: false },
+                    darkMode: { booleanValue: false },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents/${testCollection}`)
+                .send(documentData);
+            expect(response.status).toBe(201);
+            // Verify response has Firebase format
+            expect(response.body.fields.sourceIds.arrayValue).toBeDefined();
+            expect(response.body.fields.sourceIds.arrayValue.values).toHaveLength(3);
+            expect(response.body.fields.sourceIds.arrayValue.values[0].stringValue).toBe("6866ef5247046c6267ad35bb");
+            // Verify empty array
+            expect(response.body.fields.friends.arrayValue).toBeDefined();
+            expect(response.body.fields.friends.arrayValue.values).toHaveLength(0);
+        });
+        test("should handle arrays with mixed data types", async () => {
+            const documentData = {
+                fields: {
+                    mixedArray: {
+                        arrayValue: {
+                            values: [
+                                { stringValue: "hello" },
+                                { integerValue: "42" },
+                                { doubleValue: 3.14 },
+                                { booleanValue: true },
+                                { nullValue: null },
+                            ],
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents/${testCollection}`)
+                .send(documentData);
+            expect(response.status).toBe(201);
+            const arrayValues = response.body.fields.mixedArray.arrayValue.values;
+            expect(arrayValues).toHaveLength(5);
+            expect(arrayValues[0].stringValue).toBe("hello");
+            expect(arrayValues[1].integerValue).toBe("42");
+            expect(arrayValues[2].doubleValue).toBe(3.14);
+            expect(arrayValues[3].booleanValue).toBe(true);
+            expect(arrayValues[4].nullValue).toBe(null);
+        });
+        test("should handle nested arrays", async () => {
+            const documentData = {
+                fields: {
+                    nestedArray: {
+                        arrayValue: {
+                            values: [
+                                {
+                                    arrayValue: {
+                                        values: [
+                                            { stringValue: "nested1" },
+                                            { stringValue: "nested2" },
+                                        ],
+                                    },
+                                },
+                                { stringValue: "regular" },
+                            ],
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents/${testCollection}`)
+                .send(documentData);
+            expect(response.status).toBe(201);
+            const arrayValues = response.body.fields.nestedArray.arrayValue.values;
+            expect(arrayValues).toHaveLength(2);
+            expect(arrayValues[0].arrayValue.values).toHaveLength(2);
+            expect(arrayValues[0].arrayValue.values[0].stringValue).toBe("nested1");
+            expect(arrayValues[1].stringValue).toBe("regular");
+        });
+        test("should update document with array using PUT", async () => {
+            const customId = "array-update-test";
+            // Create initial document
+            const initialData = {
+                fields: {
+                    sourceIds: {
+                        arrayValue: {
+                            values: [
+                                { stringValue: "original1" },
+                                { stringValue: "original2" },
+                            ],
+                        },
+                    },
+                    friends: { arrayValue: { values: [] } },
+                    denseMode: { booleanValue: false },
+                    darkMode: { booleanValue: false },
+                },
+            };
+            await testHelper
+                .authenticatedRequest(userToken)
+                .put(`/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`)
+                .send(initialData);
+            // Update with new array data
+            const updateData = {
+                fields: {
+                    sourceIds: {
+                        arrayValue: {
+                            values: [
+                                { stringValue: "6866ef5247046c6267ad35bb" },
+                                { stringValue: "685d9e632efa0f2fbc8f4261" },
+                                { stringValue: "68012d04af809cb7c12f6233" },
+                                { stringValue: "685c30110a0fda743945d460" },
+                            ],
+                        },
+                    },
+                    friends: {
+                        arrayValue: {
+                            values: [{ stringValue: "friend1" }, { stringValue: "friend2" }],
+                        },
+                    },
+                    denseMode: { booleanValue: true },
+                    darkMode: { booleanValue: false },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .put(`/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`)
+                .send(updateData);
+            expect(response.status).toBe(200);
+            expect(response.body.fields.sourceIds.arrayValue.values).toHaveLength(4);
+            expect(response.body.fields.friends.arrayValue.values).toHaveLength(2);
+            expect(response.body.fields.denseMode.booleanValue).toBe(true);
+        });
+        test("should update document with array using PATCH", async () => {
+            const customId = "array-patch-test";
+            // Create initial document
+            const initialData = {
+                fields: {
+                    sourceIds: {
+                        arrayValue: {
+                            values: [
+                                { stringValue: "original1" },
+                                { stringValue: "original2" },
+                            ],
+                        },
+                    },
+                    keepThis: { stringValue: "preserve" },
+                },
+            };
+            await testHelper
+                .authenticatedRequest(userToken)
+                .put(`/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`)
+                .send(initialData);
+            // Patch only the array
+            const patchData = {
+                fields: {
+                    sourceIds: {
+                        arrayValue: {
+                            values: [
+                                { stringValue: "updated1" },
+                                { stringValue: "updated2" },
+                                { stringValue: "updated3" },
+                            ],
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .patch(`/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`)
+                .send(patchData);
+            expect(response.status).toBe(200);
+            expect(response.body.fields.sourceIds.arrayValue.values).toHaveLength(3);
+            expect(response.body.fields.sourceIds.arrayValue.values[0].stringValue).toBe("updated1");
+            // Verify other field is preserved
+            expect(response.body.fields.keepThis.stringValue).toBe("preserve");
+        });
+        test("should handle empty arrays", async () => {
+            const documentData = {
+                fields: {
+                    emptyArray: { arrayValue: { values: [] } },
+                    emptyArrayNoValues: { arrayValue: {} },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents/${testCollection}`)
+                .send(documentData);
+            expect(response.status).toBe(201);
+            expect(response.body.fields.emptyArray.arrayValue.values).toHaveLength(0);
+            expect(response.body.fields.emptyArrayNoValues.arrayValue.values).toHaveLength(0);
+        });
+    });
+    describe("Query Operations (runQuery)", () => {
+        const testProject = "test-project";
+        const testCollection = "newsStories";
+        beforeEach(async () => {
+            // Create test documents for querying
+            const testDocuments = [
+                {
+                    fields: {
+                        sourceId: { integerValue: "12345" },
+                        title: { stringValue: "Breaking News 1" },
+                        timestamp: { integerValue: "1700000000" },
+                        category: { stringValue: "politics" },
+                        priority: { integerValue: "1" },
+                    },
+                },
+                {
+                    fields: {
+                        sourceId: { integerValue: "12345" },
+                        title: { stringValue: "Breaking News 2" },
+                        timestamp: { integerValue: "1700000100" },
+                        category: { stringValue: "sports" },
+                        priority: { integerValue: "2" },
+                    },
+                },
+                {
+                    fields: {
+                        sourceId: { integerValue: "67890" },
+                        title: { stringValue: "Other News" },
+                        timestamp: { integerValue: "1700000050" },
+                        category: { stringValue: "tech" },
+                        priority: { integerValue: "1" },
+                    },
+                },
+                {
+                    fields: {
+                        sourceId: { integerValue: "12345" },
+                        title: { stringValue: "Breaking News 3" },
+                        timestamp: { integerValue: "1700000200" },
+                        category: { stringValue: "politics" },
+                        priority: { integerValue: "3" },
+                    },
+                },
+            ];
+            // Insert test documents
+            for (let i = 0; i < testDocuments.length; i++) {
+                await testHelper
+                    .authenticatedRequest(userToken)
+                    .put(`/projects/${testProject}/databases/(default)/documents/${testCollection}/doc${i + 1}`)
+                    .send(testDocuments[i]);
+            }
+        });
+        test("should query documents with field filter (EQUAL)", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                    where: {
+                        fieldFilter: {
+                            field: { fieldPath: "sourceId" },
+                            op: "EQUAL",
+                            value: { integerValue: "12345" },
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(200);
+            expect(Array.isArray(response.body)).toBe(true);
+            expect(response.body).toHaveLength(3); // 3 documents with sourceId=12345
+            // Verify each result has the expected structure
+            response.body.forEach((result) => {
+                expect(result.document).toBeDefined();
+                expect(result.readTime).toBeDefined();
+                expect(result.document.fields.sourceId.integerValue).toBe("12345");
+            });
+        });
+        test("should query documents with orderBy (DESCENDING)", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                    where: {
+                        fieldFilter: {
+                            field: { fieldPath: "sourceId" },
+                            op: "EQUAL",
+                            value: { integerValue: "12345" },
+                        },
+                    },
+                    orderBy: [
+                        {
+                            field: { fieldPath: "timestamp" },
+                            direction: "DESCENDING",
+                        },
+                    ],
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(3);
+            // Verify descending order by timestamp
+            const timestamps = response.body.map((result) => parseInt(result.document.fields.timestamp.integerValue));
+            expect(timestamps).toEqual([1700000200, 1700000100, 1700000000]);
+        });
+        test("should query documents with limit", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                    where: {
+                        fieldFilter: {
+                            field: { fieldPath: "sourceId" },
+                            op: "EQUAL",
+                            value: { integerValue: "12345" },
+                        },
+                    },
+                    orderBy: [
+                        {
+                            field: { fieldPath: "timestamp" },
+                            direction: "DESCENDING",
+                        },
+                    ],
+                    limit: 2,
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(2); // Limited to 2 results
+            // Verify we got the most recent 2
+            const timestamps = response.body.map((result) => parseInt(result.document.fields.timestamp.integerValue));
+            expect(timestamps).toEqual([1700000200, 1700000100]);
+        });
+        test("should query documents with comparison operators", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                    where: {
+                        fieldFilter: {
+                            field: { fieldPath: "priority" },
+                            op: "GREATER_THAN",
+                            value: { integerValue: "1" },
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(2); // priority 2 and 3
+            response.body.forEach((result) => {
+                const priority = parseInt(result.document.fields.priority.integerValue);
+                expect(priority).toBeGreaterThan(1);
+            });
+        });
+        test("should query documents with composite filters (AND)", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                    where: {
+                        compositeFilter: {
+                            op: "AND",
+                            filters: [
+                                {
+                                    fieldFilter: {
+                                        field: { fieldPath: "sourceId" },
+                                        op: "EQUAL",
+                                        value: { integerValue: "12345" },
+                                    },
+                                },
+                                {
+                                    fieldFilter: {
+                                        field: { fieldPath: "category" },
+                                        op: "EQUAL",
+                                        value: { stringValue: "politics" },
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(2); // 2 politics docs with sourceId=12345
+            response.body.forEach((result) => {
+                expect(result.document.fields.sourceId.integerValue).toBe("12345");
+                expect(result.document.fields.category.stringValue).toBe("politics");
+            });
+        });
+        test("should query documents with IN operator", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                    where: {
+                        fieldFilter: {
+                            field: { fieldPath: "category" },
+                            op: "IN",
+                            value: {
+                                arrayValue: {
+                                    values: [
+                                        { stringValue: "politics" },
+                                        { stringValue: "tech" },
+                                    ],
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(3); // 2 politics + 1 tech
+            response.body.forEach((result) => {
+                const category = result.document.fields.category.stringValue;
+                expect(["politics", "tech"]).toContain(category);
+            });
+        });
+        test("should return empty array for no matches", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                    where: {
+                        fieldFilter: {
+                            field: { fieldPath: "sourceId" },
+                            op: "EQUAL",
+                            value: { integerValue: "99999" },
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(200);
+            expect(Array.isArray(response.body)).toBe(true);
+            expect(response.body).toHaveLength(0);
+        });
+        test("should return 400 for missing structuredQuery", async () => {
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send({});
+            expect(response.status).toBe(400);
+            expect(response.body.error).toBe("Missing structuredQuery in request body");
+        });
+        test("should return 400 for missing from clause", async () => {
+            const queryData = {
+                structuredQuery: {
+                    where: {
+                        fieldFilter: {
+                            field: { fieldPath: "sourceId" },
+                            op: "EQUAL",
+                            value: { integerValue: "12345" },
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(400);
+            expect(response.body.error).toBe("Missing 'from' clause in structuredQuery");
+        });
+        test("should return 400 for unsupported filter operator", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                    where: {
+                        fieldFilter: {
+                            field: { fieldPath: "sourceId" },
+                            op: "UNSUPPORTED_OPERATOR",
+                            value: { integerValue: "12345" },
+                        },
+                    },
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(400);
+            expect(response.body.error).toContain("Invalid where clause:");
+        });
+        test("should query all documents without where clause", async () => {
+            const queryData = {
+                structuredQuery: {
+                    from: [{ collectionId: testCollection }],
+                },
+            };
+            const response = await testHelper
+                .authenticatedRequest(userToken)
+                .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+                .send(queryData);
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveLength(4); // All 4 test documents
+        });
+    });
 });

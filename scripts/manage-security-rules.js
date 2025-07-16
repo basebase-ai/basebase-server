@@ -16,7 +16,7 @@
  * Usage: npm run manage-security-rules
  *
  * Requirements:
- * - BaseBase server running on localhost:3000
+ * - BaseBase server running on localhost:8000
  * - Valid JWT token (use get-token script first)
  * - Existing project and collection
  */
@@ -29,7 +29,7 @@ const rl = readline.createInterface({
   output: process.stdout,
 });
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = "http://localhost:8000";
 
 async function question(prompt) {
   return new Promise((resolve) => {
