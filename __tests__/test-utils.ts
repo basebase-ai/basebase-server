@@ -141,7 +141,6 @@ export class TestHelper {
       .collection("projects");
     await projectsCollection.insertOne({
       _id: "test-project",
-      name: "test-project", // This is what resolveProjectDatabaseName searches for
       displayName: "Test Project",
       description: "A test project",
       ownerId: "test-user-id", // Use a consistent test user ID

@@ -34,7 +34,7 @@ async function setupProject() {
 
     // Create a test project for development
     const testProject = {
-      displayName: "Test Project (Development)",
+      name: "Test Project (Development)",
       name: "test_project_development",
       apiKey: "test-api-key-123",
       ownerId: "dev-user-id",
@@ -50,14 +50,14 @@ async function setupProject() {
 
     if (existingProject) {
       console.log("✅ Test project already exists");
-      console.log("   Display Name:", existingProject.displayName);
+      console.log("   Display Name:", existingProject.name);
       console.log("   Database Name:", existingProject.name);
       console.log("   API Key:", existingProject.apiKey);
       console.log("   ID:", existingProject._id);
     } else {
       const result = await projectsCollection.insertOne(testProject);
       console.log("✅ Test project created successfully!");
-      console.log("   Display Name:", testProject.displayName);
+      console.log("   Display Name:", testProject.name);
       console.log("   Database Name:", testProject.name);
       console.log("   API Key:", testProject.apiKey);
       console.log("   ID:", result.insertedId);

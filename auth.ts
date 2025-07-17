@@ -22,7 +22,7 @@ interface User {
 
 interface Project {
   _id: string;
-  displayName: string;
+  name: string;
   description: string;
   ownerId: string;
   apiKey: string;
@@ -41,12 +41,11 @@ interface VerificationCode {
 interface FirestoreProject {
   name: string;
   fields: {
-    displayName: { stringValue: string };
+    name: { stringValue: string };
     description: { stringValue: string };
     ownerId: { stringValue: string };
     createdAt: { timestampValue: string };
     updatedAt: { timestampValue: string };
-    name?: { stringValue: string };
   };
 }
 
@@ -83,8 +82,8 @@ function sanitizeProjectName(name: string): string {
   // Convert to lowercase and remove whitespace
   let sanitized = name.toLowerCase().trim();
 
-  // Replace spaces and invalid characters with underscores
-  sanitized = sanitized.replace(/[\s\/\\\.\"*<>:|?$]/g, "_");
+  // Replace spaces and invalid characters with underscores (keep only letters, numbers, and underscores)
+  sanitized = sanitized.replace(/[^a-z0-9_]/g, "_");
 
   // Remove consecutive underscores
   sanitized = sanitized.replace(/_{2,}/g, "_");
@@ -501,7 +500,7 @@ async function verifyCodeHandler(
       project: {
         name: `projects/${project._id}`,
         fields: {
-          displayName: { stringValue: project.displayName },
+          name: { stringValue: project.name },
           description: { stringValue: project.description || "" },
           ownerId: { stringValue: project.ownerId },
           createdAt: {
@@ -572,7 +571,7 @@ async function createProjectHandler(
     // Create project
     const newProject: Project = {
       _id: sanitizedName, // Use sanitized name as _id for database operations
-      displayName: name.trim(), // Store original name for display
+      name: name.trim(), // Store original name for display
       description: description || "",
       ownerId: userId,
       apiKey,
@@ -593,7 +592,7 @@ async function createProjectHandler(
       project: {
         name: `projects/${project._id}`,
         fields: {
-          displayName: { stringValue: project.displayName },
+          name: { stringValue: project.name },
           description: { stringValue: project.description || "" },
           ownerId: { stringValue: project.ownerId },
           createdAt: { timestampValue: project.createdAt.toISOString() },
@@ -637,7 +636,7 @@ async function listProjectsHandler(
     const projectList: FirestoreProject[] = projects.map((project) => ({
       name: `projects/${project._id}`,
       fields: {
-        displayName: { stringValue: project.displayName },
+        name: { stringValue: project.name },
         description: { stringValue: project.description || "" },
         ownerId: { stringValue: project.ownerId },
         createdAt: { timestampValue: project.createdAt.toISOString() },
@@ -695,7 +694,7 @@ async function regenerateApiKeyHandler(
       project: {
         name: `projects/${project._id}`,
         fields: {
-          displayName: { stringValue: project.displayName },
+          name: { stringValue: project.name },
           description: { stringValue: project.description || "" },
           ownerId: { stringValue: project.ownerId },
           createdAt: { timestampValue: project.createdAt.toISOString() },

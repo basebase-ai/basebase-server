@@ -57,7 +57,7 @@ Body: {
   "project": {
     "name": "projects/project_id_id",
     "fields": {
-      "displayName": { "stringValue": "My Project" },
+      "name": { "stringValue": "My Project" },
       "description": { "stringValue": "Project description" },
       "ownerId": { "stringValue": "user_id_id" },
       "createdAt": { "timestampValue": "2024-01-01T00:00:00.000Z" },

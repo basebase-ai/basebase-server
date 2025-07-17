@@ -135,7 +135,7 @@ async function main() {
 
     console.log("\n✅ Project created successfully!");
     console.log("==================================");
-    console.log(`📁 Project: ${createResponse.data.project.displayName}`);
+    console.log(`📁 Project: ${createResponse.data.project.name}`);
     console.log(`🗃️  Database Name: ${createResponse.data.project.name}`);
     console.log(`📝 Description: ${createResponse.data.project.description}`);
     console.log(`🆔 ID: ${createResponse.data.project.id}`);
@@ -174,7 +174,7 @@ async function main() {
           console.log("No projects found.");
         } else {
           listResponse.data.projects.forEach((project, index) => {
-            console.log(`${index + 1}. ${project.displayName}`);
+            console.log(`${index + 1}. ${project.name}`);
             console.log(`   ID: ${project.id}`);
             console.log(`   Database Name: ${project.name}`);
             console.log(

@@ -53,7 +53,7 @@ describe("API Integration Tests", () => {
         .collection("projects");
       await projectsCollection.insertOne({
         _id: "test-project-verify",
-        displayName: "Test Project",
+        name: "Test Project",
         description: "A test project",
         ownerId: requestResponse.body.userId,
         apiKey: testProjectApiKey,

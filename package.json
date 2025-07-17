@@ -7,7 +7,9 @@
     "start": "node dist/server.js",
     "dev": "npx ts-node server.ts",
     "build": "tsc",
-    "test": "npm run build && jest --runInBand --detectOpenHandles --forceExit"
+    "test": "npm run build && jest --runInBand --detectOpenHandles --forceExit",
+    "test:auth": "npm run build && jest __tests__/auth-flow.test.ts --runInBand --detectOpenHandles --forceExit",
+    "test:api": "npm run build && jest __tests__/api.test.ts --runInBand --detectOpenHandles --forceExit"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -134,14 +134,15 @@ async function resolveProjectDatabaseName(
 
   // First try to find by database name (exact match)
   const project = await projectsCollection.findOne({
-    name: projectName,
-  });
+    _id: projectName,
+  } as any);
 
   if (!project) {
     throw new Error(`Project '${projectName}' not found`);
   }
 
-  return project.name;
+  // Since we found the project by _id: projectName, projectName is the database name
+  return projectName;
 }
 
 // Helper function to check if database/collection exists
