@@ -92,7 +92,7 @@ function isValidObjectId(id: string): boolean {
 }
 
 function isValidName(name: string): boolean {
-  if (!name || name.length === 0 || name.length >= 24) {
+  if (!name || name.length === 0 || name.length > 255) {
     return false;
   }
 
@@ -1104,7 +1104,7 @@ app.put(
         return res.status(400).json({
           error: "Invalid document ID",
           suggestion:
-            "Document ID must be URL-safe, less than 24 characters, and contain only letters, numbers, hyphens, and underscores.",
+            "Document ID must be URL-safe, up to 255 characters, and contain only letters, numbers, hyphens, and underscores.",
         });
       }
 
@@ -1296,7 +1296,7 @@ function getRouteSuggestion(method: string, path: string): string {
     pathParts[2] === "databases" &&
     pathParts[4] === "documents"
   ) {
-    return `To set (create or replace) document '${pathParts[6]}' in collection '${pathParts[5]}' of project '${pathParts[1]}', use: PUT /projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}/${pathParts[6]} (ID must be URL-safe, <24 chars)`;
+    return `To set (create or replace) document '${pathParts[6]}' in collection '${pathParts[5]}' of project '${pathParts[1]}', use: PUT /projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}/${pathParts[6]} (ID must be URL-safe, ≤255 chars)`;
   }
 
   return `Check the available routes listed above for the correct Firebase-style API endpoint format.`;

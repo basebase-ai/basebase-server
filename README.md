@@ -149,7 +149,7 @@ Body: {
 }
 ```
 
-**Note:** `DOCUMENT_ID` can be any URL-safe string less than 24 characters, or a valid 24-character hexadecimal MongoDB ObjectId for backward compatibility. This endpoint implements "set" behavior - it will create the document if it doesn't exist, or completely replace it if it does exist.
+**Note:** `DOCUMENT_ID` can be any URL-safe string up to 255 characters, or a valid 24-character hexadecimal MongoDB ObjectId for backward compatibility. This endpoint implements "set" behavior - it will create the document if it doesn't exist, or completely replace it if it does exist.
 
 ### DELETE - DELETE
 

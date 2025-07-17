@@ -427,8 +427,9 @@ describe("API Integration Tests", () => {
     });
 
     test("should validate document ID format for PUT requests", async () => {
+      // Create an ID longer than 255 characters
       const invalidId =
-        "this-id-is-way-too-long-for-a-document-id-and-should-fail";
+        "this-id-is-way-too-long-for-a-document-id-and-should-fail-because-it-exceeds-the-maximum-allowed-length-of-255-characters-so-we-need-to-make-it-even-longer-than-that-by-adding-more-and-more-text-until-we-reach-the-point-where-it-definitely-exceeds-255-chars";
       const documentData = {
         fields: {
           name: { stringValue: "Test" },
