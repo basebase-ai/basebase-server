@@ -334,6 +334,25 @@ describe("Authentication and Project Flow", () => {
       expect(unauthorizedResponse.body.error).toContain(
         "only databases matching your project name"
       );
+
+      // Test that "public" project allows anyone to create collections
+      const publicDocumentData = {
+        fields: {
+          title: { stringValue: "Public Document" },
+          content: { stringValue: "This should work in public project" },
+        },
+      };
+
+      const publicResponse = await testHelper
+        .authenticatedRequest(p1Token)
+        .post(`/projects/public/databases/(default)/documents/testCollection`)
+        .send(publicDocumentData);
+
+      // Should succeed because "public" project allows anyone to create collections
+      expect(publicResponse.status).toBe(201);
+      expect(publicResponse.body.fields.title.stringValue).toBe(
+        "Public Document"
+      );
     });
   });
 });

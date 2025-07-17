@@ -178,6 +178,11 @@ async function validateCreationPermissions(
     collectionName
   );
 
+  // Allow anyone to create collections in the "public" project
+  if (requestedProjectName === "public") {
+    return { dbExists, collectionExists };
+  }
+
   // If database doesn't exist, only allow creation if it matches user's project
   if (!dbExists && requestedProjectName !== userProjectName) {
     throw new Error(
