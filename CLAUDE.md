@@ -54,14 +54,14 @@ Required `.env` variables:
 
 ### Authentication Endpoints (No JWT required)
 
-- `POST /requestCode` - Request SMS verification code
-- `POST /verifyCode` - Verify code and get JWT token
+- `POST /v1/requestCode` - Request SMS verification code
+- `POST /v1/verifyCode` - Verify code and get JWT token
 
 ### Project Management (JWT required)
 
-- `POST /projects` - Create new project
-- `GET /projects` - List user's projects
-- `POST /projects/:id/regenerate-key` - Regenerate project API key
+- `POST /v1/projects` - Create new project
+- `GET /v1/projects` - List user's projects
+- `POST /v1/projects/:id/regenerate-key` - Regenerate project API key
 
 ### Document CRUD (JWT required)
 

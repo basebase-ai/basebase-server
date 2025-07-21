@@ -122,7 +122,7 @@ async function main() {
     });
 
     const createResponse = await makeRequest(
-      `${serverUrl}/projects`,
+      `${serverUrl}/v1/projects`,
       "POST",
       projectData,
       { Authorization: `Bearer ${jwtToken}` }
@@ -160,7 +160,7 @@ async function main() {
       console.log("\n📋 Listing all projects...");
 
       const listResponse = await makeRequest(
-        `${serverUrl}/projects`,
+        `${serverUrl}/v1/projects`,
         "GET",
         null,
         { Authorization: `Bearer ${jwtToken}` }

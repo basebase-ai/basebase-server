@@ -18,7 +18,7 @@ To authenticate and get a JWT token, follow these steps:
 #### Step 1: Request Verification Code
 
 ```
-POST http://localhost:8000/requestCode
+POST http://localhost:8000/v1/requestCode
 
 Body: {
   "username": "your_username",
@@ -31,7 +31,7 @@ This will send an SMS verification code to the provided phone number and create 
 #### Step 2: Verify Code and Get JWT
 
 ```
-POST http://localhost:8000/verifyCode
+POST http://localhost:8000/v1/verifyCode
 
 Body: {
   "phone": "+1234567890",
@@ -94,7 +94,7 @@ Project names are automatically sanitized to ensure MongoDB database compatibili
 Add document with auto-generated ID:
 
 ```
-POST http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
+POST http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
 
 Body: {
   "fields": {
@@ -111,13 +111,13 @@ Body: {
 Get single document:
 
 ```
-GET http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 ```
 
 Get collection:
 
 ```
-GET http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
+GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
 ```
 
 ### UPDATE - PATCH
@@ -125,7 +125,7 @@ GET http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLL
 Update specific fields:
 
 ```
-PATCH http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+PATCH http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 
 Body: {
   "fields": {
@@ -139,7 +139,7 @@ Body: {
 Create or replace document with specific ID:
 
 ```
-PUT http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+PUT http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 
 Body: {
   "fields": {
@@ -154,7 +154,7 @@ Body: {
 ### DELETE - DELETE
 
 ```
-DELETE http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+DELETE http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
 ```
 
 ## Query Operations
@@ -164,7 +164,7 @@ BaseBase supports Firebase/Firestore-compatible queries using the `:runQuery` en
 ### POST `:runQuery` - Query Documents
 
 ```
-POST http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents:runQuery
+POST http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents:runQuery
 Authorization: Bearer JWT_TOKEN
 Content-Type: application/json
 ```
@@ -385,14 +385,14 @@ Each collection has metadata stored in the `collections` collection with the fol
 #### Get Collection Metadata (Security Rules & Indexes)
 
 ```
-GET http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
+GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 ```
 
 #### Update Security Rules
 
 ```
-PUT http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
+PUT http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -409,7 +409,7 @@ Body: {
 #### Update Indexes
 
 ```
-PUT http://localhost:8000/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
+PUT http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -517,7 +517,7 @@ BaseBase supports MongoDB-like indexes that can be defined for each collection. 
 ### Create Project
 
 ```
-POST http://localhost:8000/projects
+POST http://localhost:8000/v1/projects
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -529,14 +529,14 @@ Body: {
 ### List Projects
 
 ```
-GET http://localhost:8000/projects
+GET http://localhost:8000/v1/projects
 Authorization: Bearer JWT_TOKEN
 ```
 
 ### Regenerate API Key
 
 ```
-POST http://localhost:8000/projects/PROJECT_ID/regenerate-key
+POST http://localhost:8000/v1/projects/PROJECT_ID/regenerate-key
 Authorization: Bearer JWT_TOKEN
 ```
 
@@ -544,8 +544,8 @@ Authorization: Bearer JWT_TOKEN
 
 The API uses Firebase-style path structure to match the Firestore REST API exactly:
 
-- `/projects/{PROJECT_ID}/databases/(default)/documents/{COLLECTION_ID}` for collection operations
-- `/projects/{PROJECT_ID}/databases/(default)/documents/{COLLECTION_ID}/{DOCUMENT_ID}` for document operations
+- `/v1/projects/{PROJECT_ID}/databases/(default)/documents/{COLLECTION_ID}` for collection operations
+- `/v1/projects/{PROJECT_ID}/databases/(default)/documents/{COLLECTION_ID}/{DOCUMENT_ID}` for document operations
 
 Where:
 
@@ -556,8 +556,8 @@ Where:
 
 Examples:
 
-- `POST /projects/my-awesome-project/databases/(default)/documents/users` (display name)
-- `POST /projects/my_awesome_project/databases/(default)/documents/users` (database name)
+- `POST /v1/projects/my-awesome-project/databases/(default)/documents/users` (display name)
+- `POST /v1/projects/my_awesome_project/databases/(default)/documents/users` (database name)
   Both resolve to the same `my_awesome_project` database
 
 ## Data Format

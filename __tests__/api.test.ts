@@ -26,10 +26,12 @@ describe("API Integration Tests", () => {
 
   describe("Authentication", () => {
     test("should request verification code", async () => {
-      const response = await request(testHelper.app).post("/requestCode").send({
-        username: "Test User",
-        phone: "+15551234567",
-      });
+      const response = await request(testHelper.app)
+        .post("/v1/requestCode")
+        .send({
+          username: "Test User",
+          phone: "+15551234567",
+        });
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBeDefined();
@@ -38,7 +40,7 @@ describe("API Integration Tests", () => {
     test("should verify code and return token", async () => {
       // First request a code
       const requestResponse = await request(testHelper.app)
-        .post("/requestCode")
+        .post("/v1/requestCode")
         .send({
           username: "Test User",
           phone: "+15551234567",
@@ -76,11 +78,13 @@ describe("API Integration Tests", () => {
       const actualCode = verificationCodeDoc.code;
 
       // Then verify it
-      const response = await request(testHelper.app).post("/verifyCode").send({
-        phone: "+15551234567",
-        code: actualCode,
-        projectApiKey: testProjectApiKey,
-      });
+      const response = await request(testHelper.app)
+        .post("/v1/verifyCode")
+        .send({
+          phone: "+15551234567",
+          code: actualCode,
+          projectApiKey: testProjectApiKey,
+        });
 
       expect(response.status).toBe(200);
       expect(response.body.token).toBeDefined();
@@ -101,7 +105,7 @@ describe("API Integration Tests", () => {
         },
       };
 
-      const url = `/projects/${testProject}/databases/(default)/documents/${testCollection}`;
+      const url = `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`;
       console.log(`Making POST request to: ${url}`);
 
       const response = await testHelper
@@ -132,7 +136,7 @@ describe("API Integration Tests", () => {
       const createResponse = await testHelper
         .authenticatedRequest(userToken)
         .post(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         )
         .send(documentData);
 
@@ -143,7 +147,7 @@ describe("API Integration Tests", () => {
       const getResponse = await testHelper
         .authenticatedRequest(userToken)
         .get(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${documentId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${documentId}`
         );
 
       expect(getResponse.status).toBe(200);
@@ -165,7 +169,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .put(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         )
         .send(documentData);
 
@@ -189,7 +193,7 @@ describe("API Integration Tests", () => {
       await testHelper
         .authenticatedRequest(userToken)
         .put(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         )
         .send(initialData);
 
@@ -204,7 +208,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .patch(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         )
         .send(updateData);
 
@@ -230,7 +234,7 @@ describe("API Integration Tests", () => {
       await testHelper
         .authenticatedRequest(userToken)
         .put(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         )
         .send(documentData);
 
@@ -238,7 +242,7 @@ describe("API Integration Tests", () => {
       const deleteResponse = await testHelper
         .authenticatedRequest(userToken)
         .delete(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         );
 
       expect(deleteResponse.status).toBe(200);
@@ -248,7 +252,7 @@ describe("API Integration Tests", () => {
       const getResponse = await testHelper
         .authenticatedRequest(userToken)
         .get(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         );
 
       expect(getResponse.status).toBe(404);
@@ -284,7 +288,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         )
         .send(documentData);
 
@@ -303,7 +307,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .get(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/non-existent-id`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/non-existent-id`
         );
 
       expect(response.status).toBe(404);
@@ -317,14 +321,14 @@ describe("API Integration Tests", () => {
       await testHelper
         .authenticatedRequest(userToken)
         .post(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         )
         .send(doc1Data);
 
       await testHelper
         .authenticatedRequest(userToken)
         .post(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         )
         .send(doc2Data);
 
@@ -332,7 +336,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .get(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         );
 
       expect(response.status).toBe(200);
@@ -350,7 +354,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .get(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/_security`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/_security`
         );
 
       expect(response.status).toBe(200);
@@ -378,7 +382,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .put(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/_security`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/_security`
         )
         .send(securityData);
 
@@ -392,7 +396,7 @@ describe("API Integration Tests", () => {
   describe("Error Handling", () => {
     test("should return 401 for unauthenticated requests", async () => {
       const response = await request(testHelper.app).get(
-        "/projects/test-project/databases/(default)/documents/users"
+        "/v1/projects/test-project/databases/(default)/documents/users"
       );
 
       expect(response.status).toBe(401);
@@ -407,7 +411,7 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post("/projects/test-project/databases/(default)/documents/users")
+        .post("/v1/projects/test-project/databases/(default)/documents/users")
         .send(invalidData);
 
       expect(response.status).toBe(201); // Server accepts any fields, so this should succeed
@@ -417,7 +421,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .get(
-          "/projects/non-existent-project/databases/(default)/documents/users"
+          "/v1/projects/non-existent-project/databases/(default)/documents/users"
         );
 
       expect(response.status).toBe(404);
@@ -439,7 +443,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .put(
-          `/projects/test-project/databases/(default)/documents/users/${invalidId}`
+          `/v1/projects/test-project/databases/(default)/documents/users/${invalidId}`
         )
         .send(documentData);
 
@@ -473,7 +477,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         )
         .send(documentData);
 
@@ -511,7 +515,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         )
         .send(documentData);
 
@@ -550,7 +554,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         )
         .send(documentData);
 
@@ -586,7 +590,7 @@ describe("API Integration Tests", () => {
       await testHelper
         .authenticatedRequest(userToken)
         .put(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         )
         .send(initialData);
 
@@ -616,7 +620,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .put(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         )
         .send(updateData);
 
@@ -647,7 +651,7 @@ describe("API Integration Tests", () => {
       await testHelper
         .authenticatedRequest(userToken)
         .put(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         )
         .send(initialData);
 
@@ -669,7 +673,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .patch(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${customId}`
         )
         .send(patchData);
 
@@ -693,7 +697,7 @@ describe("API Integration Tests", () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post(
-          `/projects/${testProject}/databases/(default)/documents/${testCollection}`
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
         )
         .send(documentData);
 
@@ -755,7 +759,7 @@ describe("API Integration Tests", () => {
         await testHelper
           .authenticatedRequest(userToken)
           .put(
-            `/projects/${testProject}/databases/(default)/documents/${testCollection}/doc${
+            `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/doc${
               i + 1
             }`
           )
@@ -779,7 +783,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -816,7 +822,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -852,7 +860,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -881,7 +891,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -907,7 +919,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -930,7 +944,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -972,7 +988,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -1007,7 +1025,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -1035,7 +1055,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);
@@ -1046,7 +1068,9 @@ describe("API Integration Tests", () => {
     test("should return 400 for missing structuredQuery", async () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send({});
 
       expect(response.status).toBe(400);
@@ -1070,7 +1094,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(400);
@@ -1095,7 +1121,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(400);
@@ -1111,7 +1139,9 @@ describe("API Integration Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post(`/projects/${testProject}/databases/(default)/documents:runQuery`)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
         .send(queryData);
 
       expect(response.status).toBe(200);

@@ -156,7 +156,7 @@ export class TestHelper {
     try {
       // Step 1: Request verification code - needs username and phone
       const requestResponse = await request(this.app)
-        .post("/requestCode")
+        .post("/v1/requestCode")
         .send({
           username: "Test User",
           phone: this.testPhoneNumber,
@@ -191,11 +191,13 @@ export class TestHelper {
       console.log("Using actual verification code:", actualCode);
 
       // Step 2: Verify code and get JWT - needs phone, code, and projectApiKey
-      const verifyResponse = await request(this.app).post("/verifyCode").send({
-        phone: this.testPhoneNumber,
-        code: actualCode,
-        projectApiKey: testProjectApiKey,
-      });
+      const verifyResponse = await request(this.app)
+        .post("/v1/verifyCode")
+        .send({
+          phone: this.testPhoneNumber,
+          code: actualCode,
+          projectApiKey: testProjectApiKey,
+        });
 
       if (verifyResponse.status !== 200) {
         console.error("VerifyCode failed:", {

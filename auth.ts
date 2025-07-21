@@ -720,7 +720,7 @@ function setupAuthRoutes(
 ): void {
   // Request verification code
   app.post(
-    "/requestCode",
+    "/v1/requestCode",
     checkConnection,
     async (req: Request, res: Response) => {
       await requestCodeHandler(req, res, mongoClient);
@@ -729,7 +729,7 @@ function setupAuthRoutes(
 
   // Verify code and get JWT
   app.post(
-    "/verifyCode",
+    "/v1/verifyCode",
     checkConnection,
     async (req: Request, res: Response) => {
       await verifyCodeHandler(req, res, mongoClient);
@@ -738,7 +738,7 @@ function setupAuthRoutes(
 
   // Project management routes (require JWT)
   app.post(
-    "/projects",
+    "/v1/projects",
     checkConnection,
     authenticateToken,
     async (req: AuthenticatedRequest, res: Response) => {
@@ -747,7 +747,7 @@ function setupAuthRoutes(
   );
 
   app.get(
-    "/projects",
+    "/v1/projects",
     checkConnection,
     authenticateToken,
     async (req: AuthenticatedRequest, res: Response) => {
@@ -756,7 +756,7 @@ function setupAuthRoutes(
   );
 
   app.post(
-    "/projects/:projectId/regenerate-key",
+    "/v1/projects/:projectId/regenerate-key",
     checkConnection,
     authenticateToken,
     async (req: AuthenticatedRequest, res: Response) => {

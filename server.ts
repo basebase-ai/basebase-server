@@ -468,7 +468,7 @@ function convertToFirestoreFormat(mongoDoc: MongoDocument): FirestoreDocument {
 
 // CREATE - POST document (auto-generated _id ID)
 app.post(
-  "/projects/:projectId/databases/\\(default\\)/documents/:collectionId",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -476,7 +476,7 @@ app.post(
       const { projectId, collectionId } = req.params;
 
       console.log(
-        `[CREATE] POST /projects/${projectId}/databases/(default)/documents/${collectionId}`
+        `[CREATE] POST /v1/projects/${projectId}/databases/(default)/documents/${collectionId}`
       );
       console.log(
         `[CREATE] User: ${req.user!.userId}, Project: ${req.user!.projectName}`
@@ -582,7 +582,7 @@ app.post(
 
 // GET security rules for a collection
 app.get(
-  "/projects/:projectId/databases/\\(default\\)/documents/:collectionId/_security",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId/_security",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -632,7 +632,7 @@ app.get(
 
 // PUT security rules for a collection
 app.put(
-  "/projects/:projectId/databases/\\(default\\)/documents/:collectionId/_security",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId/_security",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -698,7 +698,7 @@ app.put(
 
 // READ - GET single document
 app.get(
-  "/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -706,7 +706,7 @@ app.get(
       const { projectId, collectionId, documentId } = req.params;
 
       console.log(
-        `[READ] GET /projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
+        `[READ] GET /v1/projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
       );
       console.log(
         `[READ] User: ${req.user!.userId}, Project: ${req.user!.projectName}`
@@ -757,7 +757,7 @@ app.get(
 
 // READ - GET collection
 app.get(
-  "/projects/:projectId/databases/\\(default\\)/documents/:collectionId",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -893,7 +893,7 @@ function convertOrderBy(orderBy: any[]): any {
 
 // QUERY - POST runQuery (Firebase/Firestore compatible)
 app.post(
-  "/projects/:projectId/databases/\\(default\\)/documents:runQuery",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents:runQuery",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -988,7 +988,7 @@ app.post(
 
 // UPDATE - PATCH document
 app.patch(
-  "/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -996,7 +996,7 @@ app.patch(
       const { projectId, collectionId, documentId } = req.params;
 
       console.log(
-        `[UPDATE] PATCH /projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
+        `[UPDATE] PATCH /v1/projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
       );
       console.log(
         `[UPDATE] User: ${req.user!.userId}, Project: ${req.user!.projectName}`
@@ -1090,7 +1090,7 @@ app.patch(
 
 // SET - PUT document (create or replace with specific _id ID)
 app.put(
-  "/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -1098,7 +1098,7 @@ app.put(
       const { projectId, collectionId, documentId } = req.params;
 
       console.log(
-        `[SET] PUT /projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
+        `[SET] PUT /v1/projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
       );
       console.log(
         `[SET] User: ${req.user!.userId}, Project: ${req.user!.projectName}`
@@ -1193,7 +1193,7 @@ app.put(
 
 // DELETE - DELETE document
 app.delete(
-  "/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
+  "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
   checkConnection,
   authenticateToken,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -1201,7 +1201,7 @@ app.delete(
       const { projectId, collectionId, documentId } = req.params;
 
       console.log(
-        `[DELETE] DELETE /projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
+        `[DELETE] DELETE /v1/projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
       );
       console.log(
         `[DELETE] User: ${req.user!.userId}, Project: ${req.user!.projectName}`
@@ -1278,7 +1278,7 @@ function getRouteSuggestion(method: string, path: string): string {
     pathParts[2] === "databases" &&
     pathParts[4] === "documents"
   ) {
-    return `To create a document in collection '${pathParts[5]}' of project '${pathParts[1]}' with auto-generated _id, use: POST /projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}`;
+    return `To create a document in collection '${pathParts[5]}' of project '${pathParts[1]}' with auto-generated _id, use: POST /v1/projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}`;
   } else if (
     method === "GET" &&
     pathParts.length === 7 &&
@@ -1286,7 +1286,7 @@ function getRouteSuggestion(method: string, path: string): string {
     pathParts[2] === "databases" &&
     pathParts[4] === "documents"
   ) {
-    return `To get document '${pathParts[6]}' from collection '${pathParts[5]}' of project '${pathParts[1]}', use: GET /projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}/${pathParts[6]}`;
+    return `To get document '${pathParts[6]}' from collection '${pathParts[5]}' of project '${pathParts[1]}', use: GET /v1/projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}/${pathParts[6]}`;
   } else if (
     method === "GET" &&
     pathParts.length === 6 &&
@@ -1294,7 +1294,7 @@ function getRouteSuggestion(method: string, path: string): string {
     pathParts[2] === "databases" &&
     pathParts[4] === "documents"
   ) {
-    return `To get all documents from collection '${pathParts[5]}' of project '${pathParts[1]}', use: GET /projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}`;
+    return `To get all documents from collection '${pathParts[5]}' of project '${pathParts[1]}', use: GET /v1/projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}`;
   } else if (
     method === "PUT" &&
     pathParts.length === 7 &&
@@ -1302,7 +1302,7 @@ function getRouteSuggestion(method: string, path: string): string {
     pathParts[2] === "databases" &&
     pathParts[4] === "documents"
   ) {
-    return `To set (create or replace) document '${pathParts[6]}' in collection '${pathParts[5]}' of project '${pathParts[1]}', use: PUT /projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}/${pathParts[6]} (ID must be URL-safe, ≤255 chars)`;
+    return `To set (create or replace) document '${pathParts[6]}' in collection '${pathParts[5]}' of project '${pathParts[1]}', use: PUT /v1/projects/${pathParts[1]}/databases/(default)/documents/${pathParts[5]}/${pathParts[6]} (ID must be URL-safe, ≤255 chars)`;
   }
 
   return `Check the available routes listed above for the correct Firebase-style API endpoint format.`;
@@ -1320,28 +1320,28 @@ async function startServer(): Promise<void> {
     console.log(`[404] ${req.method} ${req.path} - Route not found`);
     console.log(`[404] Available routes for data operations:`);
     console.log(
-      `  POST /projects/[projectId]/databases/(default)/documents/[collectionId] - Create document (auto-generated _id)`
+      `  POST /v1/projects/[projectId]/databases/(default)/documents/[collectionId] - Create document (auto-generated _id)`
     );
     console.log(
-      `  GET /projects/[projectId]/databases/(default)/documents/[collectionId] - Get all documents`
+      `  GET /v1/projects/[projectId]/databases/(default)/documents/[collectionId] - Get all documents`
     );
     console.log(
-      `  GET /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Get specific document`
+      `  GET /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Get specific document`
     );
     console.log(
-      `  PATCH /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Update document`
+      `  PATCH /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Update document`
     );
     console.log(
-      `  PUT /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Set document (create or replace with specific _id)`
+      `  PUT /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Set document (create or replace with specific _id)`
     );
     console.log(
-      `  DELETE /projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Delete document`
+      `  DELETE /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/[documentId] - Delete document`
     );
     console.log(
-      `  GET /projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Get collection metadata`
+      `  GET /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Get collection metadata`
     );
     console.log(
-      `  PUT /projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Update collection metadata`
+      `  PUT /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Update collection metadata`
     );
 
     res.status(404).json({
@@ -1351,17 +1351,17 @@ async function startServer(): Promise<void> {
       suggestion: getRouteSuggestion(req.method, req.path),
       availableRoutes: {
         create:
-          "POST /projects/:projectId/databases/(default)/documents/:collectionId (auto-generated _id)",
-        read: "GET /projects/:projectId/databases/(default)/documents/:collectionId or GET /projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
+          "POST /v1/projects/:projectId/databases/(default)/documents/:collectionId (auto-generated _id)",
+        read: "GET /v1/projects/:projectId/databases/(default)/documents/:collectionId or GET /v1/projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
         update:
-          "PATCH /projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
-        set: "PUT /projects/:projectId/databases/(default)/documents/:collectionId/:documentId (create or replace with specific _id)",
+          "PATCH /v1/projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
+        set: "PUT /v1/projects/:projectId/databases/(default)/documents/:collectionId/:documentId (create or replace with specific _id)",
         delete:
-          "DELETE /projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
+          "DELETE /v1/projects/:projectId/databases/(default)/documents/:collectionId/:documentId",
         metadata:
-          "GET/PUT /projects/:projectId/databases/(default)/documents/:collectionId/_security",
-        auth: "POST /requestCode, POST /verifyCode",
-        projects: "GET /projects, POST /projects",
+          "GET/PUT /v1/projects/:projectId/databases/(default)/documents/:collectionId/_security",
+        auth: "POST /v1/requestCode, POST /v1/verifyCode",
+        projects: "GET /v1/projects, POST /v1/projects",
       },
     });
   });

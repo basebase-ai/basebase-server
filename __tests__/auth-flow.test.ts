@@ -45,7 +45,7 @@ describe("Authentication and Project Flow", () => {
 
       const createProjectResponse = await testHelper
         .authenticatedRequest(initialToken)
-        .post("/projects")
+        .post("/v1/projects")
         .send(newProjectData);
 
       console.log("Create project response:", {
@@ -71,7 +71,7 @@ describe("Authentication and Project Flow", () => {
 
       // Request verification code
       const requestCodeResponse = await request(testHelper.app)
-        .post("/requestCode")
+        .post("/v1/requestCode")
         .send({
           username: testUsername,
           phone: testPhoneNumber,
@@ -93,7 +93,7 @@ describe("Authentication and Project Flow", () => {
 
       // Verify code with new project API key
       const verifyCodeResponse = await request(testHelper.app)
-        .post("/verifyCode")
+        .post("/v1/verifyCode")
         .send({
           phone: testPhoneNumber,
           code: verificationCode,
@@ -124,7 +124,7 @@ describe("Authentication and Project Flow", () => {
 
       const listProjectsResponse = await testHelper
         .authenticatedRequest(newProjectToken)
-        .get("/projects");
+        .get("/v1/projects");
 
       expect(listProjectsResponse.status).toBe(200);
       expect(listProjectsResponse.body.projects).toBeDefined();
@@ -155,7 +155,7 @@ describe("Authentication and Project Flow", () => {
       const createDocResponse = await testHelper
         .authenticatedRequest(newProjectToken)
         .post(
-          `/projects/${newProjectId}/databases/(default)/documents/testCollection`
+          `/v1/projects/${newProjectId}/databases/(default)/documents/testCollection`
         )
         .send(documentData);
 
@@ -176,7 +176,7 @@ describe("Authentication and Project Flow", () => {
       const readDocResponse = await testHelper
         .authenticatedRequest(newProjectToken)
         .get(
-          `/projects/${newProjectId}/databases/(default)/documents/testCollection/${documentId}`
+          `/v1/projects/${newProjectId}/databases/(default)/documents/testCollection/${documentId}`
         );
 
       expect(readDocResponse.status).toBe(200);
@@ -191,7 +191,7 @@ describe("Authentication and Project Flow", () => {
       const readCollectionResponse = await testHelper
         .authenticatedRequest(newProjectToken)
         .get(
-          `/projects/${newProjectId}/databases/(default)/documents/testCollection`
+          `/v1/projects/${newProjectId}/databases/(default)/documents/testCollection`
         );
 
       expect(readCollectionResponse.status).toBe(200);
@@ -248,7 +248,7 @@ describe("Authentication and Project Flow", () => {
 
       const response = await testHelper
         .authenticatedRequest(token)
-        .post("/projects")
+        .post("/v1/projects")
         .send(projectData);
 
       expect(response.status).toBe(201);
@@ -268,7 +268,7 @@ describe("Authentication and Project Flow", () => {
       // Create first project
       const project1Response = await testHelper
         .authenticatedRequest(token)
-        .post("/projects")
+        .post("/v1/projects")
         .send({
           name: "Project1",
           description: "First project",
@@ -280,7 +280,7 @@ describe("Authentication and Project Flow", () => {
       // Create second project
       const project2Response = await testHelper
         .authenticatedRequest(token)
-        .post("/projects")
+        .post("/v1/projects")
         .send({
           name: "Project2",
           description: "Second project",
@@ -295,7 +295,7 @@ describe("Authentication and Project Flow", () => {
         .collection("verification_codes");
 
       // Request new code
-      await request(testHelper.app).post("/requestCode").send({
+      await request(testHelper.app).post("/v1/requestCode").send({
         username: testUsername,
         phone: testPhoneNumber,
       });
@@ -305,7 +305,7 @@ describe("Authentication and Project Flow", () => {
       });
 
       const project1Token = await request(testHelper.app)
-        .post("/verifyCode")
+        .post("/v1/verifyCode")
         .send({
           phone: testPhoneNumber,
           code: codeDoc!.code,
@@ -325,7 +325,7 @@ describe("Authentication and Project Flow", () => {
       const unauthorizedResponse = await testHelper
         .authenticatedRequest(p1Token)
         .post(
-          `/projects/${project2Id}/databases/(default)/documents/testCollection`
+          `/v1/projects/${project2Id}/databases/(default)/documents/testCollection`
         )
         .send(documentData);
 
@@ -345,7 +345,9 @@ describe("Authentication and Project Flow", () => {
 
       const publicResponse = await testHelper
         .authenticatedRequest(p1Token)
-        .post(`/projects/public/databases/(default)/documents/testCollection`)
+        .post(
+          `/v1/projects/public/databases/(default)/documents/testCollection`
+        )
         .send(publicDocumentData);
 
       // Should succeed because "public" project allows anyone to create collections

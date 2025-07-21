@@ -124,7 +124,7 @@ async function main() {
     });
 
     const codeResponse = await makeRequest(
-      `${serverUrl}/requestCode`,
+      `${serverUrl}/v1/requestCode`,
       "POST",
       requestCodeData
     );
@@ -159,7 +159,7 @@ async function main() {
     });
 
     const tokenResponse = await makeRequest(
-      `${serverUrl}/verifyCode`,
+      `${serverUrl}/v1/verifyCode`,
       "POST",
       verifyCodeData
     );

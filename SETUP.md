@@ -86,7 +86,7 @@
 #### 1. Request verification code:
 
 ```bash
-curl -X POST http://localhost:8000/requestCode \
+curl -X POST http://localhost:8000/v1/requestCode \
   -H "Content-Type: application/json" \
   -d '{
     "username": "John Doe",
@@ -120,7 +120,7 @@ First, create a project document in `basebase.projects` collection:
 #### 3. Verify code and get JWT token:
 
 ```bash
-curl -X POST http://localhost:8000/verifyCode \
+curl -X POST http://localhost:8000/v1/verifyCode \
   -H "Content-Type: application/json" \
   -d '{
     "phone": "+1234567890",
@@ -134,7 +134,7 @@ curl -X POST http://localhost:8000/verifyCode \
 #### Create a project:
 
 ```bash
-curl -X POST http://localhost:8000/projects \
+curl -X POST http://localhost:8000/v1/projects \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -154,14 +154,14 @@ curl -X POST http://localhost:8000/projects \
 #### List your projects:
 
 ```bash
-curl http://localhost:8000/projects \
+curl http://localhost:8000/v1/projects \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 #### Regenerate API key:
 
 ```bash
-curl -X POST http://localhost:8000/projects/PROJECT_ID/regenerate-key \
+curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/regenerate-key \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -170,7 +170,7 @@ curl -X POST http://localhost:8000/projects/PROJECT_ID/regenerate-key \
 #### Create a document:
 
 ```bash
-curl -X POST http://localhost:8000/projects/myProject/databases/\(default\)/documents/users \
+curl -X POST http://localhost:8000/v1/projects/myProject/databases/\(default\)/documents/users \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -184,14 +184,14 @@ curl -X POST http://localhost:8000/projects/myProject/databases/\(default\)/docu
 #### Read a document:
 
 ```bash
-curl http://localhost:8000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
+curl http://localhost:8000/v1/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 #### Update a document:
 
 ```bash
-curl -X PATCH http://localhost:8000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
+curl -X PATCH http://localhost:8000/v1/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
@@ -204,14 +204,14 @@ curl -X PATCH http://localhost:8000/projects/myProject/databases/\(default\)/doc
 #### Delete a document:
 
 ```bash
-curl -X DELETE http://localhost:8000/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
+curl -X DELETE http://localhost:8000/v1/projects/myProject/databases/\(default\)/documents/users/DOCUMENT_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 #### Get all documents in a collection:
 
 ```bash
-curl http://localhost:8000/projects/myProject/databases/\(default\)/documents/users \
+curl http://localhost:8000/v1/projects/myProject/databases/\(default\)/documents/users \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -219,24 +219,24 @@ curl http://localhost:8000/projects/myProject/databases/\(default\)/documents/us
 
 ### Authentication Endpoints (no JWT required):
 
-- `POST /requestCode` - Request verification code
-- `POST /verifyCode` - Verify code and get JWT token
+- `POST /v1/requestCode` - Request verification code
+- `POST /v1/verifyCode` - Verify code and get JWT token
 
 ### Project Management Endpoints (JWT required):
 
-- `POST /projects` - Create a new project
-- `GET /projects` - List your projects
-- `POST /projects/:projectId/regenerate-key` - Regenerate API key
+- `POST /v1/projects` - Create a new project
+- `GET /v1/projects` - List your projects
+- `POST /v1/projects/:projectId/regenerate-key` - Regenerate API key
 
 ### CRUD Endpoints (JWT required):
 
-- `POST /projects/projectId/databases/(default)/documents/collectionId` - Create document
-- `GET /projects/projectId/databases/(default)/documents/collectionId` - Read collection
-- `GET /projects/projectId/databases/(default)/documents/collectionId/documentId` - Read single document
-- `PATCH /projects/projectId/databases/(default)/documents/collectionId/documentId` - Update document
-- `DELETE /projects/projectId/databases/(default)/documents/collectionId/documentId` - Delete document
-- `GET /projects/projectId/databases/(default)/documents/collectionId/_security` - Get collection metadata
-- `PUT /projects/projectId/databases/(default)/documents/collectionId/_security` - Update collection metadata
+- `POST /v1/projects/projectId/databases/(default)/documents/collectionId` - Create document
+- `GET /v1/projects/projectId/databases/(default)/documents/collectionId` - Read collection
+- `GET /v1/projects/projectId/databases/(default)/documents/collectionId/documentId` - Read single document
+- `PATCH /v1/projects/projectId/databases/(default)/documents/collectionId/documentId` - Update document
+- `DELETE /v1/projects/projectId/databases/(default)/documents/collectionId/documentId` - Delete document
+- `GET /v1/projects/projectId/databases/(default)/documents/collectionId/_security` - Get collection metadata
+- `PUT /v1/projects/projectId/databases/(default)/documents/collectionId/_security` - Update collection metadata
 
 Where:
 
