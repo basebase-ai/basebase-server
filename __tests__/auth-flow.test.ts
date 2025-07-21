@@ -155,7 +155,7 @@ describe("Authentication and Project Flow", () => {
       const createDocResponse = await testHelper
         .authenticatedRequest(newProjectToken)
         .post(
-          `/v1/projects/${newProjectId}/databases/(default)/documents/testCollection`
+          `/v1/projects/${newProjectId}/databases/(default)/documents/test_collection`
         )
         .send(documentData);
 
@@ -176,7 +176,7 @@ describe("Authentication and Project Flow", () => {
       const readDocResponse = await testHelper
         .authenticatedRequest(newProjectToken)
         .get(
-          `/v1/projects/${newProjectId}/databases/(default)/documents/testCollection/${documentId}`
+          `/v1/projects/${newProjectId}/databases/(default)/documents/test_collection/${documentId}`
         );
 
       expect(readDocResponse.status).toBe(200);
@@ -191,7 +191,7 @@ describe("Authentication and Project Flow", () => {
       const readCollectionResponse = await testHelper
         .authenticatedRequest(newProjectToken)
         .get(
-          `/v1/projects/${newProjectId}/databases/(default)/documents/testCollection`
+          `/v1/projects/${newProjectId}/databases/(default)/documents/test_collection`
         );
 
       expect(readCollectionResponse.status).toBe(200);
@@ -261,9 +261,19 @@ describe("Authentication and Project Flow", () => {
     });
 
     test("should prevent access to wrong project documents", async () => {
-      // Create two projects
+      // Create initial test project and user
       await testHelper.createTestProject();
       const token = await testHelper.createTestUser();
+
+      // Create the special "public" project that allows cross-project access
+      const publicProjectResponse = await testHelper
+        .authenticatedRequest(token)
+        .post("/v1/projects")
+        .send({
+          name: "public",
+          description: "Public project for cross-project access",
+        });
+      expect(publicProjectResponse.status).toBe(201);
 
       // Create first project
       const project1Response = await testHelper
@@ -325,7 +335,7 @@ describe("Authentication and Project Flow", () => {
       const unauthorizedResponse = await testHelper
         .authenticatedRequest(p1Token)
         .post(
-          `/v1/projects/${project2Id}/databases/(default)/documents/testCollection`
+          `/v1/projects/${project2Id}/databases/(default)/documents/test_collection`
         )
         .send(documentData);
 
@@ -346,7 +356,7 @@ describe("Authentication and Project Flow", () => {
       const publicResponse = await testHelper
         .authenticatedRequest(p1Token)
         .post(
-          `/v1/projects/public/databases/(default)/documents/testCollection`
+          `/v1/projects/public/databases/(default)/documents/test_collection`
         )
         .send(publicDocumentData);
 

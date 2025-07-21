@@ -711,7 +711,7 @@ describe("API Integration Tests", () => {
 
   describe("Query Operations (runQuery)", () => {
     const testProject = "test-project";
-    const testCollection = "newsStories";
+    const testCollection = "news_stories";
 
     beforeEach(async () => {
       // Create test documents for querying

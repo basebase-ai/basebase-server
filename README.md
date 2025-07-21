@@ -291,7 +291,7 @@ Get recent news articles from specific source:
 ```json
 {
   "structuredQuery": {
-    "from": [{ "collectionId": "newsStories" }],
+    "from": [{ "collectionId": "news_stories" }],
     "where": {
       "compositeFilter": {
         "op": "AND",

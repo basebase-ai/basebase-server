@@ -49,6 +49,11 @@ interface ServerFunction {
   requiredServices: string[];
   createdAt: Date;
   updatedAt: Date;
+  // New fields for user functions
+  schedule?: string; // Cron expression (optional)
+  enabled?: boolean; // Whether function is active (default: true)
+  createdBy?: string; // User ID (undefined for global basebase functions)
+  isUserFunction?: boolean; // True for user-defined functions
 }
 
 interface FunctionExecutionContext {
@@ -59,6 +64,78 @@ interface FunctionExecutionContext {
   project: {
     name: string;
   };
+  // New: Firebase-style data API
+  data: DataAPI;
+  // New: Function calling capability
+  functions: FunctionAPI;
+  // New: Console for logging
+  console: ConsoleAPI;
+}
+
+// New interfaces for Firebase-style API
+interface DataAPI {
+  collection(name: string): CollectionAPI;
+}
+
+interface CollectionAPI {
+  // Firebase-style methods
+  getDoc(id: string): Promise<any | null>;
+  getDocs(options?: GetDocsOptions): Promise<any[]>;
+  addDoc(data: Record<string, any>): Promise<{ id: string; doc: any }>;
+  setDoc(id: string, data: Record<string, any>): Promise<{ doc: any }>;
+  updateDoc(
+    id: string,
+    data: Partial<Record<string, any>>
+  ): Promise<{ doc: any }>;
+  deleteDoc(id: string): Promise<{ success: boolean }>;
+  queryDocs(filter: QueryFilter): Promise<any[]>;
+}
+
+interface GetDocsOptions {
+  limit?: number;
+  orderBy?: { field: string; direction: "asc" | "desc" };
+  startAfter?: string;
+}
+
+interface QueryFilter {
+  where?: Array<{
+    field: string;
+    operator:
+      | "=="
+      | "!="
+      | ">"
+      | ">="
+      | "<"
+      | "<="
+      | "in"
+      | "not-in"
+      | "contains";
+    value: any;
+  }>;
+  orderBy?: { field: string; direction: "asc" | "desc" };
+  limit?: number;
+}
+
+interface FunctionAPI {
+  call(functionName: string, data?: Record<string, any>): Promise<any>;
+}
+
+interface ConsoleAPI {
+  log(...args: any[]): void;
+  error(...args: any[]): void;
+  warn(...args: any[]): void;
+}
+
+interface ScheduledJob {
+  _id: string;
+  projectId: string;
+  functionId: string;
+  cronExpression: string;
+  nextRun: Date;
+  lastRun?: Date;
+  enabled: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface FunctionCallRequest {
@@ -433,11 +510,464 @@ function convertFromFirestoreFormat(firestoreDoc: any): MongoDocument {
   return mongoDoc;
 }
 
-// Helper function to get server functions collection
+// Helper function to get server functions collection (global basebase functions)
 function getServerFunctionsCollection(): Collection<ServerFunction> {
   return mongoClient
     .db("basebase")
     .collection<ServerFunction>("server_functions");
+}
+
+// Helper function to get project-specific server functions collection
+function getProjectFunctionsCollection(
+  projectName: string
+): Collection<ServerFunction> {
+  return mongoClient
+    .db(projectName)
+    .collection<ServerFunction>("server_functions");
+}
+
+// Helper function to get scheduled jobs collection
+function getScheduledJobsCollection(): Collection<ScheduledJob> {
+  return mongoClient.db("basebase").collection<ScheduledJob>("scheduled_jobs");
+}
+
+// Firebase-style data API implementation
+class ProjectDataAPI implements DataAPI {
+  constructor(private projectName: string) {}
+
+  collection(name: string): CollectionAPI {
+    if (!isValidCollectionName(name)) {
+      throw new Error("Invalid collection name");
+    }
+    return new ProjectCollectionAPI(this.projectName, name);
+  }
+}
+
+class ProjectCollectionAPI implements CollectionAPI {
+  constructor(private projectName: string, private collectionName: string) {}
+
+  async getDoc(id: string): Promise<any | null> {
+    const { collection } = getDbAndCollection(
+      this.projectName,
+      this.collectionName
+    );
+    const query = buildDocumentQuery(id);
+    const doc = await collection.findOne(query);
+    return doc ? convertToFirestoreFormat(doc) : null;
+  }
+
+  async getDocs(options?: GetDocsOptions): Promise<any[]> {
+    const { collection } = getDbAndCollection(
+      this.projectName,
+      this.collectionName
+    );
+    let query = collection.find({});
+
+    if (options?.orderBy) {
+      const sortDirection = options.orderBy.direction === "desc" ? -1 : 1;
+      const sortObj: any = { [options.orderBy.field]: sortDirection };
+      query = query.sort(sortObj);
+    }
+
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    const docs = await query.toArray();
+    return docs.map((doc) => convertToFirestoreFormat(doc));
+  }
+
+  async addDoc(data: Record<string, any>): Promise<{ id: string; doc: any }> {
+    const { collection } = getDbAndCollection(
+      this.projectName,
+      this.collectionName
+    );
+    const document = convertFromFirestoreFormat({ fields: data });
+
+    // Generate unique ID
+    const documentId = generateName();
+    document._id = documentId;
+
+    const now = new Date();
+    document.createdAt = now;
+    document.updatedAt = now;
+
+    await collection.insertOne(document);
+
+    return {
+      id: documentId,
+      doc: convertToFirestoreFormat(document),
+    };
+  }
+
+  async setDoc(id: string, data: Record<string, any>): Promise<{ doc: any }> {
+    const { collection } = getDbAndCollection(
+      this.projectName,
+      this.collectionName
+    );
+    const document = convertFromFirestoreFormat({ fields: data });
+
+    const query = buildDocumentQuery(id);
+    const existingDoc = await collection.findOne(query);
+
+    const now = new Date();
+    if (existingDoc) {
+      document._id = existingDoc._id;
+      document.createdAt = existingDoc.createdAt || now;
+      document.updatedAt = now;
+      await collection.replaceOne(query, document);
+    } else {
+      document._id = id;
+      document.createdAt = now;
+      document.updatedAt = now;
+      await collection.insertOne(document);
+    }
+
+    return { doc: convertToFirestoreFormat(document) };
+  }
+
+  async updateDoc(
+    id: string,
+    data: Partial<Record<string, any>>
+  ): Promise<{ doc: any }> {
+    const { collection } = getDbAndCollection(
+      this.projectName,
+      this.collectionName
+    );
+    const updateData = convertFromFirestoreFormat({ fields: data });
+
+    delete updateData._id;
+    updateData.updatedAt = new Date();
+
+    const query = buildDocumentQuery(id);
+    await collection.updateOne(query, { $set: updateData });
+
+    const updatedDoc = await collection.findOne(query);
+    if (!updatedDoc) {
+      throw new Error("Document not found");
+    }
+
+    return { doc: convertToFirestoreFormat(updatedDoc) };
+  }
+
+  async deleteDoc(id: string): Promise<{ success: boolean }> {
+    const { collection } = getDbAndCollection(
+      this.projectName,
+      this.collectionName
+    );
+    const query = buildDocumentQuery(id);
+    const result = await collection.deleteOne(query);
+
+    return { success: result.deletedCount > 0 };
+  }
+
+  async queryDocs(filter: QueryFilter): Promise<any[]> {
+    const { collection } = getDbAndCollection(
+      this.projectName,
+      this.collectionName
+    );
+
+    // Convert filter to MongoDB query
+    let mongoQuery: any = {};
+    if (filter.where) {
+      for (const condition of filter.where) {
+        const { field, operator, value } = condition;
+
+        switch (operator) {
+          case "==":
+            mongoQuery[field] = value;
+            break;
+          case "!=":
+            mongoQuery[field] = { $ne: value };
+            break;
+          case ">":
+            mongoQuery[field] = { $gt: value };
+            break;
+          case ">=":
+            mongoQuery[field] = { $gte: value };
+            break;
+          case "<":
+            mongoQuery[field] = { $lt: value };
+            break;
+          case "<=":
+            mongoQuery[field] = { $lte: value };
+            break;
+          case "in":
+            mongoQuery[field] = { $in: Array.isArray(value) ? value : [value] };
+            break;
+          case "not-in":
+            mongoQuery[field] = {
+              $nin: Array.isArray(value) ? value : [value],
+            };
+            break;
+          case "contains":
+            mongoQuery[field] = value;
+            break;
+        }
+      }
+    }
+
+    let query = collection.find(mongoQuery);
+
+    if (filter.orderBy) {
+      const sortDirection = filter.orderBy.direction === "desc" ? -1 : 1;
+      const sortObj: any = { [filter.orderBy.field]: sortDirection };
+      query = query.sort(sortObj);
+    }
+
+    if (filter.limit) {
+      query = query.limit(filter.limit);
+    }
+
+    const docs = await query.toArray();
+    return docs.map((doc) => convertToFirestoreFormat(doc));
+  }
+}
+
+// Function API implementation
+class ProjectFunctionAPI implements FunctionAPI {
+  constructor(
+    private projectName: string,
+    private context: FunctionExecutionContext
+  ) {}
+
+  async call(functionName: string, data?: Record<string, any>): Promise<any> {
+    // First try to find in project functions
+    const projectFunctionsCollection = getProjectFunctionsCollection(
+      this.projectName
+    );
+    let serverFunction = await projectFunctionsCollection.findOne({
+      _id: functionName,
+    });
+
+    // If not found, try global basebase functions
+    if (!serverFunction) {
+      const globalFunctionsCollection = getServerFunctionsCollection();
+      serverFunction = await globalFunctionsCollection.findOne({
+        _id: functionName,
+      });
+    }
+
+    if (!serverFunction) {
+      throw new Error(`Function '${functionName}' not found`);
+    }
+
+    // Execute the function
+    return await executeServerFunction(
+      serverFunction.implementationCode,
+      data || {},
+      this.context,
+      serverFunction.requiredServices
+    );
+  }
+}
+
+// Console API implementation
+class FunctionConsoleAPI implements ConsoleAPI {
+  private logs: string[] = [];
+
+  log(...args: any[]): void {
+    const message = args
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+    this.logs.push(`[LOG] ${new Date().toISOString()}: ${message}`);
+    console.log(`[FUNCTION LOG]`, ...args);
+  }
+
+  error(...args: any[]): void {
+    const message = args
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+    this.logs.push(`[ERROR] ${new Date().toISOString()}: ${message}`);
+    console.error(`[FUNCTION ERROR]`, ...args);
+  }
+
+  warn(...args: any[]): void {
+    const message = args
+      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .join(" ");
+    this.logs.push(`[WARN] ${new Date().toISOString()}: ${message}`);
+    console.warn(`[FUNCTION WARN]`, ...args);
+  }
+
+  getLogs(): string[] {
+    return [...this.logs];
+  }
+}
+
+// Simple cron expression parser for basic scheduling
+class SimpleScheduler {
+  private static instance: SimpleScheduler;
+  private intervalId: NodeJS.Timeout | null = null;
+
+  static getInstance(): SimpleScheduler {
+    if (!SimpleScheduler.instance) {
+      SimpleScheduler.instance = new SimpleScheduler();
+    }
+    return SimpleScheduler.instance;
+  }
+
+  start(): void {
+    if (this.intervalId) {
+      return; // Already running
+    }
+
+    console.log("[SCHEDULER] Starting function scheduler...");
+
+    // Check every minute for functions to run
+    this.intervalId = setInterval(async () => {
+      await this.checkScheduledFunctions();
+    }, 60000); // 60 seconds
+  }
+
+  stop(): void {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+      console.log("[SCHEDULER] Stopped function scheduler");
+    }
+  }
+
+  private async checkScheduledFunctions(): Promise<void> {
+    try {
+      const now = new Date();
+      console.log(
+        `[SCHEDULER] Checking scheduled functions at ${now.toISOString()}`
+      );
+
+      // Get all projects that have scheduled functions
+      const adminDb = mongoClient.db().admin();
+      const databases = await adminDb.listDatabases();
+
+      for (const dbInfo of databases.databases) {
+        if (
+          dbInfo.name === "admin" ||
+          dbInfo.name === "local" ||
+          dbInfo.name === "config" ||
+          dbInfo.name === "basebase"
+        ) {
+          continue; // Skip system databases
+        }
+
+        try {
+          const projectFunctionsCollection = getProjectFunctionsCollection(
+            dbInfo.name
+          );
+          const scheduledFunctions = await projectFunctionsCollection
+            .find({
+              schedule: { $exists: true, $type: "string" },
+              enabled: { $ne: false },
+            })
+            .toArray();
+
+          for (const func of scheduledFunctions) {
+            if (this.shouldRunFunction(func.schedule!, now)) {
+              console.log(
+                `[SCHEDULER] Executing scheduled function: ${func._id} in project ${dbInfo.name}`
+              );
+
+              // Execute function in background
+              setImmediate(async () => {
+                try {
+                  await this.executeScheduledFunction(dbInfo.name, func);
+                } catch (error) {
+                  console.error(
+                    `[SCHEDULER] Error executing scheduled function ${func._id}:`,
+                    error
+                  );
+                }
+              });
+            }
+          }
+        } catch (error) {
+          console.error(
+            `[SCHEDULER] Error checking functions in project ${dbInfo.name}:`,
+            error
+          );
+        }
+      }
+    } catch (error) {
+      console.error("[SCHEDULER] Error in scheduler:", error);
+    }
+  }
+
+  private shouldRunFunction(schedule: string, now: Date): boolean {
+    // Simple schedule parsing - support basic formats:
+    // "*/10 * * * *" = every 10 minutes
+    // "0 */1 * * *" = every hour
+    // "0 9 * * *" = daily at 9 AM
+
+    if (schedule === "*/10 * * * *") {
+      // Every 10 minutes
+      return now.getMinutes() % 10 === 0 && now.getSeconds() < 30;
+    }
+
+    if (schedule === "0 */1 * * *") {
+      // Every hour
+      return now.getMinutes() === 0 && now.getSeconds() < 30;
+    }
+
+    if (schedule === "0 9 * * *") {
+      // Daily at 9 AM
+      return (
+        now.getHours() === 9 && now.getMinutes() === 0 && now.getSeconds() < 30
+      );
+    }
+
+    // Add more schedule patterns as needed
+    console.warn(`[SCHEDULER] Unsupported schedule format: ${schedule}`);
+    return false;
+  }
+
+  private async executeScheduledFunction(
+    projectName: string,
+    func: ServerFunction
+  ): Promise<void> {
+    try {
+      // Create execution context for scheduled function
+      const consoleAPI = new FunctionConsoleAPI();
+      const dataAPI = new ProjectDataAPI(projectName);
+
+      const partialContext: Partial<FunctionExecutionContext> = {
+        user: {
+          userId: func.createdBy || "system",
+          projectName: projectName,
+        },
+        project: {
+          name: projectName,
+        },
+        data: dataAPI,
+        console: consoleAPI,
+      };
+
+      const functionsAPI = new ProjectFunctionAPI(
+        projectName,
+        partialContext as FunctionExecutionContext
+      );
+      const executionContext: FunctionExecutionContext = {
+        ...partialContext,
+        functions: functionsAPI,
+      } as FunctionExecutionContext;
+
+      // Execute the function
+      const result = await executeServerFunction(
+        func.implementationCode,
+        {}, // No parameters for scheduled execution
+        executionContext,
+        func.requiredServices
+      );
+
+      console.log(
+        `[SCHEDULER] Successfully executed scheduled function ${func._id}:`,
+        result
+      );
+    } catch (error) {
+      console.error(
+        `[SCHEDULER] Failed to execute scheduled function ${func._id}:`,
+        error
+      );
+    }
+  }
 }
 
 // Helper function to initialize default server functions
@@ -683,7 +1213,7 @@ function convertToFirestoreFormat(mongoDoc: MongoDocument): FirestoreDocument {
 
 // SERVER FUNCTIONS ENDPOINTS (JWT required)
 
-// LIST SERVER FUNCTIONS - GET
+// LIST ALL FUNCTIONS (GLOBAL + PROJECT) - GET
 app.get(
   "/v1/functions",
   checkConnection,
@@ -697,22 +1227,53 @@ app.get(
         }`
       );
 
-      const functionsCollection = getServerFunctionsCollection();
-      const functions = await functionsCollection
-        .find({}, { projection: { implementationCode: 0 } }) // Exclude implementation code from listing
+      // Get global basebase functions
+      const globalFunctionsCollection = getServerFunctionsCollection();
+      const globalFunctions = await globalFunctionsCollection
+        .find({}, { projection: { implementationCode: 0 } })
         .toArray();
 
-      console.log(`[FUNCTION] Found ${functions.length} server functions`);
+      // Get project-specific functions
+      const projectFunctionsCollection = getProjectFunctionsCollection(
+        req.user!.projectName
+      );
+      const projectFunctions = await projectFunctionsCollection
+        .find({}, { projection: { implementationCode: 0 } })
+        .toArray();
 
-      res.json({
-        functions: functions.map((func) => ({
+      const allFunctions = [
+        ...globalFunctions.map((func) => ({
           id: func._id,
           description: func.description,
           requiredServices: func.requiredServices,
           createdAt: func.createdAt,
           updatedAt: func.updatedAt,
+          isUserFunction: false,
+          schedule: func.schedule,
+          enabled: func.enabled !== false,
         })),
-        count: functions.length,
+        ...projectFunctions.map((func) => ({
+          id: func._id,
+          description: func.description,
+          requiredServices: func.requiredServices,
+          createdAt: func.createdAt,
+          updatedAt: func.updatedAt,
+          isUserFunction: true,
+          schedule: func.schedule,
+          enabled: func.enabled !== false,
+          createdBy: func.createdBy,
+        })),
+      ];
+
+      console.log(
+        `[FUNCTION] Found ${globalFunctions.length} global + ${projectFunctions.length} project functions`
+      );
+
+      res.json({
+        functions: allFunctions,
+        count: allFunctions.length,
+        globalCount: globalFunctions.length,
+        projectCount: projectFunctions.length,
       });
     } catch (error) {
       console.error(`[FUNCTION] Error listing functions:`, error);
@@ -724,7 +1285,7 @@ app.get(
   }
 );
 
-// GET SPECIFIC SERVER FUNCTION - GET
+// GET SPECIFIC FUNCTION - GET (checks both global and project functions)
 app.get(
   "/v1/functions/:functionName",
   checkConnection,
@@ -740,10 +1301,24 @@ app.get(
         }`
       );
 
-      const functionsCollection = getServerFunctionsCollection();
-      const serverFunction = await functionsCollection.findOne({
+      // First try project functions
+      const projectFunctionsCollection = getProjectFunctionsCollection(
+        req.user!.projectName
+      );
+      let serverFunction = await projectFunctionsCollection.findOne({
         _id: functionName,
       });
+
+      let isUserFunction = true;
+
+      // If not found, try global functions
+      if (!serverFunction) {
+        const globalFunctionsCollection = getServerFunctionsCollection();
+        serverFunction = await globalFunctionsCollection.findOne({
+          _id: functionName,
+        });
+        isUserFunction = false;
+      }
 
       if (!serverFunction) {
         console.log(`[FUNCTION] Function not found: ${functionName}`);
@@ -762,11 +1337,244 @@ app.get(
         requiredServices: serverFunction.requiredServices,
         createdAt: serverFunction.createdAt,
         updatedAt: serverFunction.updatedAt,
+        isUserFunction,
+        schedule: serverFunction.schedule,
+        enabled: serverFunction.enabled !== false,
+        createdBy: serverFunction.createdBy,
       });
     } catch (error) {
       console.error(`[FUNCTION] Error getting function:`, error);
       res.status(500).json({
         error: "Failed to get function",
+        suggestion: "Contact support if the problem persists.",
+      });
+    }
+  }
+);
+
+// CREATE USER FUNCTION - POST
+app.post(
+  "/v1/functions",
+  checkConnection,
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const {
+        id,
+        description,
+        implementationCode,
+        requiredServices,
+        schedule,
+        enabled,
+      } = req.body;
+
+      if (!id || !description || !implementationCode) {
+        return res.status(400).json({
+          error: "Missing required fields",
+          suggestion:
+            "Function must have 'id', 'description', and 'implementationCode' fields.",
+        });
+      }
+
+      if (!isValidName(id)) {
+        return res.status(400).json({
+          error: "Invalid function ID",
+          suggestion:
+            "Function ID must be URL-safe, up to 255 characters, and contain only letters, numbers, hyphens, and underscores.",
+        });
+      }
+
+      console.log(`[FUNCTION] POST /v1/functions - Creating function ${id}`);
+      console.log(
+        `[FUNCTION] User: ${req.user!.userId}, Project: ${
+          req.user!.projectName
+        }`
+      );
+
+      const projectFunctionsCollection = getProjectFunctionsCollection(
+        req.user!.projectName
+      );
+
+      // Check if function already exists
+      const existingFunction = await projectFunctionsCollection.findOne({
+        _id: id,
+      });
+      if (existingFunction) {
+        return res.status(409).json({
+          error: "Function already exists",
+          suggestion: `A function with ID '${id}' already exists. Use PUT to update it.`,
+        });
+      }
+
+      const now = new Date();
+      const newFunction: ServerFunction = {
+        _id: id,
+        description,
+        implementationCode,
+        requiredServices: requiredServices || [],
+        schedule,
+        enabled: enabled !== false,
+        createdBy: req.user!.userId,
+        isUserFunction: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await projectFunctionsCollection.insertOne(newFunction);
+
+      console.log(
+        `[FUNCTION] Created user function ${id} in project ${
+          req.user!.projectName
+        }`
+      );
+
+      res.status(201).json({
+        id: newFunction._id,
+        description: newFunction.description,
+        requiredServices: newFunction.requiredServices,
+        schedule: newFunction.schedule,
+        enabled: newFunction.enabled,
+        isUserFunction: true,
+        createdBy: newFunction.createdBy,
+        createdAt: newFunction.createdAt,
+        updatedAt: newFunction.updatedAt,
+      });
+    } catch (error) {
+      console.error(`[FUNCTION] Error creating function:`, error);
+      res.status(500).json({
+        error: "Failed to create function",
+        suggestion:
+          "Check your function data and try again. Contact support if the problem persists.",
+      });
+    }
+  }
+);
+
+// UPDATE USER FUNCTION - PUT
+app.put(
+  "/v1/functions/:functionName",
+  checkConnection,
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { functionName } = req.params;
+      const {
+        description,
+        implementationCode,
+        requiredServices,
+        schedule,
+        enabled,
+      } = req.body;
+
+      console.log(`[FUNCTION] PUT /v1/functions/${functionName}`);
+      console.log(
+        `[FUNCTION] User: ${req.user!.userId}, Project: ${
+          req.user!.projectName
+        }`
+      );
+
+      const projectFunctionsCollection = getProjectFunctionsCollection(
+        req.user!.projectName
+      );
+
+      // Check if function exists and belongs to user
+      const existingFunction = await projectFunctionsCollection.findOne({
+        _id: functionName,
+      });
+      if (!existingFunction) {
+        return res.status(404).json({
+          error: "Function not found",
+          suggestion: `Function '${functionName}' does not exist in your project.`,
+        });
+      }
+
+      const updateData: Partial<ServerFunction> = {
+        updatedAt: new Date(),
+      };
+
+      if (description !== undefined) updateData.description = description;
+      if (implementationCode !== undefined)
+        updateData.implementationCode = implementationCode;
+      if (requiredServices !== undefined)
+        updateData.requiredServices = requiredServices;
+      if (schedule !== undefined) updateData.schedule = schedule;
+      if (enabled !== undefined) updateData.enabled = enabled;
+
+      await projectFunctionsCollection.updateOne(
+        { _id: functionName },
+        { $set: updateData }
+      );
+
+      const updatedFunction = await projectFunctionsCollection.findOne({
+        _id: functionName,
+      });
+
+      console.log(`[FUNCTION] Updated user function ${functionName}`);
+
+      res.json({
+        id: updatedFunction!._id,
+        description: updatedFunction!.description,
+        implementationCode: updatedFunction!.implementationCode,
+        requiredServices: updatedFunction!.requiredServices,
+        schedule: updatedFunction!.schedule,
+        enabled: updatedFunction!.enabled,
+        isUserFunction: true,
+        createdBy: updatedFunction!.createdBy,
+        createdAt: updatedFunction!.createdAt,
+        updatedAt: updatedFunction!.updatedAt,
+      });
+    } catch (error) {
+      console.error(`[FUNCTION] Error updating function:`, error);
+      res.status(500).json({
+        error: "Failed to update function",
+        suggestion:
+          "Check your function data and try again. Contact support if the problem persists.",
+      });
+    }
+  }
+);
+
+// DELETE USER FUNCTION - DELETE
+app.delete(
+  "/v1/functions/:functionName",
+  checkConnection,
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { functionName } = req.params;
+
+      console.log(`[FUNCTION] DELETE /v1/functions/${functionName}`);
+      console.log(
+        `[FUNCTION] User: ${req.user!.userId}, Project: ${
+          req.user!.projectName
+        }`
+      );
+
+      const projectFunctionsCollection = getProjectFunctionsCollection(
+        req.user!.projectName
+      );
+
+      const result = await projectFunctionsCollection.deleteOne({
+        _id: functionName,
+      });
+
+      if (result.deletedCount === 0) {
+        return res.status(404).json({
+          error: "Function not found",
+          suggestion: `Function '${functionName}' does not exist in your project.`,
+        });
+      }
+
+      console.log(`[FUNCTION] Deleted user function ${functionName}`);
+
+      res.json({
+        message: "Function deleted successfully",
+        functionName,
+      });
+    } catch (error) {
+      console.error(`[FUNCTION] Error deleting function:`, error);
+      res.status(500).json({
+        error: "Failed to delete function",
         suggestion: "Contact support if the problem persists.",
       });
     }
@@ -833,22 +1641,35 @@ app.post(
         });
       }
 
-      // Get the server function from the database
-      const functionsCollection = getServerFunctionsCollection();
-      const serverFunction = await functionsCollection.findOne({
+      // Get the server function from the database (try project first, then global)
+      const projectFunctionsCollection =
+        getProjectFunctionsCollection(targetDbName);
+      let serverFunction = await projectFunctionsCollection.findOne({
         _id: functionName,
       });
+
+      // If not found in project, try global functions
+      if (!serverFunction) {
+        const globalFunctionsCollection = getServerFunctionsCollection();
+        serverFunction = await globalFunctionsCollection.findOne({
+          _id: functionName,
+        });
+      }
 
       if (!serverFunction) {
         console.log(`[FUNCTION] Function not found: ${functionName}`);
         return res.status(404).json({
           error: "Function not found",
-          suggestion: `The function '${functionName}' does not exist. Available functions can be found in the server functions collection.`,
+          suggestion: `The function '${functionName}' does not exist. Available functions can be found by calling GET /v1/functions.`,
         });
       }
 
       // Prepare execution context
-      const executionContext: FunctionExecutionContext = {
+      const consoleAPI = new FunctionConsoleAPI();
+      const dataAPI = new ProjectDataAPI(targetDbName);
+
+      // Create a partial context first to avoid circular reference
+      const partialContext: Partial<FunctionExecutionContext> = {
         user: {
           userId: req.user!.userId,
           projectName: req.user!.projectName,
@@ -856,7 +1677,19 @@ app.post(
         project: {
           name: targetDbName,
         },
+        data: dataAPI,
+        console: consoleAPI,
       };
+
+      // Now create the full context with functions API
+      const functionsAPI = new ProjectFunctionAPI(
+        targetDbName,
+        partialContext as FunctionExecutionContext
+      );
+      const executionContext: FunctionExecutionContext = {
+        ...partialContext,
+        functions: functionsAPI,
+      } as FunctionExecutionContext;
 
       console.log(`[FUNCTION] Executing function ${functionName}`);
 
@@ -1835,6 +2668,10 @@ async function startServer(): Promise<void> {
   // Initialize default server functions
   await initializeDefaultServerFunctions();
 
+  // Start the function scheduler
+  const scheduler = SimpleScheduler.getInstance();
+  scheduler.start();
+
   // Setup authentication routes after MongoDB connection
   setupAuthRoutes(app, mongoClient, checkConnection);
 
@@ -1934,6 +2771,11 @@ async function startServer(): Promise<void> {
 // Graceful shutdown
 process.on("SIGINT", async () => {
   console.log("\nShutting down server...");
+
+  // Stop the scheduler
+  const scheduler = SimpleScheduler.getInstance();
+  scheduler.stop();
+
   if (mongoClient) {
     await mongoClient.close();
   }
