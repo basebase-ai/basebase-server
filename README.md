@@ -464,20 +464,253 @@ curl -X POST http://localhost:8000/v1/projects/my-project/functions/sendSms:call
 }
 ```
 
-### Function Management
+### User-Defined Functions
 
-#### List Available Functions
+In addition to built-in functions, you can create custom functions that run on the BaseBase server. User functions have access to the database, can call other functions, and support scheduled execution.
+
+#### Creating User Functions
+
+```bash
+curl -X POST http://localhost:8000/v1/functions \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "processUserData",
+    "description": "Processes user activity data and creates reports",
+    "implementationCode": "async (params, context) => { const { console, data, functions } = context; const { userId } = params; if (!userId) throw new Error(\"userId required\"); console.log(`Processing data for user: ${userId}`); const activities = await data.collection(\"user_activities\").queryDocs({ where: [{ field: \"userId\", operator: \"==\", value: userId }], limit: 100 }); const summary = { userId, totalActivities: activities.length, lastActivity: activities[0] || null, processedAt: new Date().toISOString() }; await data.collection(\"user_reports\").addDoc(summary); return summary; }",
+    "requiredServices": [],
+    "enabled": true
+  }'
+```
+
+#### Function Code Structure
+
+User functions are JavaScript async functions with the following signature:
+
+```javascript
+async (params, context) => {
+  // Function implementation
+  return result;
+};
+```
+
+**Parameters:**
+
+- `params`: Object containing input parameters passed to the function
+- `context`: Execution context with APIs and utilities
+
+**Context APIs:**
+
+- `context.console`: Logging (`console.log`, `console.error`, `console.warn`)
+- `context.data`: Database API (Firebase-style operations)
+- `context.functions`: Function API (call other functions)
+- `context.user`: User information (`userId`, `projectName`)
+- `context.project`: Project information (`name`)
+
+#### Database API (context.data)
+
+```javascript
+// Get single document
+const user = await data.collection("users").getDoc("user123");
+
+// Get all documents
+const allUsers = await data.collection("users").getDocs();
+
+// Add document with auto-generated ID
+const newDoc = await data.collection("users").addDoc({
+  name: "John Doe",
+  email: "john@example.com",
+});
+
+// Set document with specific ID
+await data.collection("users").setDoc("user123", {
+  name: "Jane Doe",
+  email: "jane@example.com",
+});
+
+// Update document
+await data.collection("users").updateDoc("user123", {
+  lastLogin: new Date(),
+});
+
+// Delete document
+await data.collection("users").deleteDoc("user123");
+
+// Query documents
+const results = await data.collection("users").queryDocs({
+  where: [
+    { field: "active", operator: "==", value: true },
+    { field: "age", operator: ">", value: 18 },
+  ],
+  orderBy: [{ field: "name", direction: "asc" }],
+  limit: 50,
+});
+```
+
+#### Calling Other Functions
+
+```javascript
+// Call built-in function
+const webpage = await functions.call("getPage", {
+  url: "https://api.example.com/data",
+});
+
+// Call user function
+const result = await functions.call("myOtherFunction", { param1: "value1" });
+```
+
+#### Scheduled Functions
+
+Functions can be scheduled to run automatically using cron expressions:
+
+```bash
+curl -X POST http://localhost:8000/v1/functions \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "dailyCleanup",
+    "description": "Cleans up old temporary data daily",
+    "implementationCode": "async (params, context) => { const { console, data } = context; console.log(\"Starting daily cleanup...\"); const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000); const oldRecords = await data.collection(\"temp_data\").queryDocs({ where: [{ field: \"createdAt\", operator: \"<\", value: yesterday }] }); let deleted = 0; for (const record of oldRecords) { await data.collection(\"temp_data\").deleteDoc(record.id); deleted++; } console.log(`Cleaned up ${deleted} old records`); return { deleted, cleanupDate: new Date().toISOString() }; }",
+    "requiredServices": [],
+    "schedule": "0 2 * * *",
+    "enabled": true
+  }'
+```
+
+**Supported Schedule Formats:**
+
+- `"*/10 * * * *"` - Every 10 minutes
+- `"0 */1 * * *"` - Every hour
+- `"0 2 * * *"` - Daily at 2 AM
+- `"0 9 * * 1"` - Every Monday at 9 AM
+
+#### Function Management
+
+**List All Functions (Built-in + User):**
 
 ```bash
 curl http://localhost:8000/v1/functions \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-#### Get Function Details
+**Get Function Details:**
 
 ```bash
 curl http://localhost:8000/v1/functions/FUNCTION_NAME \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Update Function:**
+
+```bash
+curl -X PUT http://localhost:8000/v1/functions/FUNCTION_NAME \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Updated description",
+    "implementationCode": "async (params, context) => { return { updated: true }; }",
+    "schedule": "0 */2 * * *",
+    "enabled": false
+  }'
+```
+
+**Delete Function:**
+
+```bash
+curl -X DELETE http://localhost:8000/v1/functions/FUNCTION_NAME \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+#### Function Examples
+
+**RSS Feed Processor:**
+
+```javascript
+async (params, context) => {
+  const { console, data, functions } = context;
+
+  // Get news sources that need updating
+  const sources = await data.collection("news_sources").queryDocs({
+    where: [
+      {
+        field: "lastUpdated",
+        operator: "<",
+        value: new Date(Date.now() - 10 * 60 * 1000),
+      },
+    ],
+    limit: 10,
+  });
+
+  let processed = 0;
+  for (const source of sources) {
+    try {
+      // Fetch RSS feed
+      const response = await functions.call("getPage", { url: source.rssUrl });
+
+      if (response.success) {
+        // Parse and store articles (simplified)
+        const articles = parseRSS(response.data);
+        for (const article of articles) {
+          await data.collection("articles").addDoc({
+            title: article.title,
+            url: article.url,
+            sourceId: source.id,
+            publishedAt: new Date(article.pubDate || Date.now()),
+          });
+        }
+
+        // Update source timestamp
+        await data.collection("news_sources").updateDoc(source.id, {
+          lastUpdated: new Date(),
+          articlesCount: (source.articlesCount || 0) + articles.length,
+        });
+
+        processed++;
+      }
+    } catch (error) {
+      console.error(`Failed to process source ${source.name}:`, error.message);
+    }
+  }
+
+  return { processed, total: sources.length };
+};
+```
+
+**Data Analytics Function:**
+
+```javascript
+async (params, context) => {
+  const { console, data } = context;
+  const { timeRange = "24h" } = params;
+
+  const hours = timeRange === "7d" ? 24 * 7 : 24;
+  const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+  // Get recent user activities
+  const activities = await data.collection("user_activities").queryDocs({
+    where: [{ field: "timestamp", operator: ">=", value: since }],
+  });
+
+  // Analyze data
+  const analytics = {
+    totalActivities: activities.length,
+    uniqueUsers: new Set(activities.map((a) => a.userId)).size,
+    topActions: {},
+    timeRange,
+    generatedAt: new Date().toISOString(),
+  };
+
+  // Count action types
+  activities.forEach((activity) => {
+    analytics.topActions[activity.action] =
+      (analytics.topActions[activity.action] || 0) + 1;
+  });
+
+  // Store analytics report
+  await data.collection("analytics_reports").addDoc(analytics);
+
+  return analytics;
+};
 ```
 
 ### Security & Access Control
