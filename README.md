@@ -344,6 +344,162 @@ The `:runQuery` endpoint returns an array of documents in Firebase format:
 ]
 ```
 
+## Basebase Functions
+
+BaseBase supports server-side functions that can be invoked via HTTP endpoints. Functions are executed in a secure sandbox environment and can access external services like HTTP APIs and SMS providers.
+
+### Invoking Functions
+
+Functions are called using POST requests to the following endpoint pattern:
+
+```
+POST http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME:call
+Authorization: Bearer JWT_TOKEN
+Content-Type: application/json
+```
+
+**Request Body:**
+
+```json
+{
+  "data": {
+    "parameter1": "value1",
+    "parameter2": "value2"
+  }
+}
+```
+
+**Response Format:**
+
+```json
+{
+  "success": true,
+  "result": {
+    // Function-specific response data
+  },
+  "functionName": "FUNCTION_NAME",
+  "executedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+### Available Functions
+
+#### getPage()
+
+Retrieves the contents of a webpage using HTTP GET.
+
+**Required Parameters:**
+
+- `url` (string): The URL to fetch
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:8000/v1/projects/my-project/functions/getPage:call \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": {
+      "url": "https://example.com"
+    }
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "result": {
+    "success": true,
+    "data": "<html>...</html>",
+    "status": 200,
+    "headers": {
+      "content-type": "text/html"
+    },
+    "url": "https://example.com"
+  },
+  "functionName": "getPage",
+  "executedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### sendSms()
+
+Sends an SMS message using Twilio.
+
+**Required Parameters:**
+
+- `to` (string): Phone number in format +1234567890
+- `message` (string): Text message content
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:8000/v1/projects/my-project/functions/sendSms:call \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": {
+      "to": "+1234567890",
+      "message": "Hello from BaseBase!"
+    }
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "result": {
+    "success": true,
+    "message": "SMS sent successfully",
+    "to": "+1234567890",
+    "messageLength": 20,
+    "timestamp": "2024-01-01T00:00:00.000Z"
+  },
+  "functionName": "sendSms",
+  "executedAt": "2024-01-01T00:00:00.000Z"
+}
+```
+
+### Function Management
+
+#### List Available Functions
+
+```bash
+curl http://localhost:8000/v1/functions \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+#### Get Function Details
+
+```bash
+curl http://localhost:8000/v1/functions/FUNCTION_NAME \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Security & Access Control
+
+- **Authentication Required**: All function operations require a valid JWT token
+- **Project Scoped**: Functions can only be called within the authenticated user's own project
+- **Timeout Protection**: Functions have a 30-second execution timeout
+- **Sandbox Environment**: Functions execute in a controlled environment with access only to approved services
+
+### Error Handling
+
+Functions return structured error responses when execution fails:
+
+```json
+{
+  "error": "Function execution failed",
+  "details": "Parameter 'url' is required and must be a string",
+  "functionName": "getPage",
+  "suggestion": "Check the function parameters and try again."
+}
+```
+
 ## Security Rules
 
 BaseBase automatically creates security rules for each collection using Firebase Security Rules syntax. When a new collection is created, default rules are initialized that allow all operations.
