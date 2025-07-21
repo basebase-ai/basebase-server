@@ -94,7 +94,7 @@ Project names are automatically sanitized to ensure MongoDB database compatibili
 Add document with auto-generated ID:
 
 ```
-POST http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
+POST http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles
 
 Body: {
   "fields": {
@@ -104,6 +104,8 @@ Body: {
 }
 ```
 
+⚠️ **Note**: Collection names must be lowercase with underscores/hyphens only. Using `userProfiles` (camelCase) will return a 400 error.
+
 **Note:** POST creates documents with auto-generated `_id` IDs (72-bit base64 strings). To create or replace a document with a specific ID, use the PUT endpoint instead.
 
 ### READ - GET
@@ -111,13 +113,13 @@ Body: {
 Get single document:
 
 ```
-GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles/DOCUMENT_ID
 ```
 
 Get collection:
 
 ```
-GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID
+GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles
 ```
 
 ### UPDATE - PATCH
@@ -125,7 +127,7 @@ GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/C
 Update specific fields:
 
 ```
-PATCH http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+PATCH http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles/DOCUMENT_ID
 
 Body: {
   "fields": {
@@ -139,7 +141,7 @@ Body: {
 Create or replace document with specific ID:
 
 ```
-PUT http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+PUT http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles/DOCUMENT_ID
 
 Body: {
   "fields": {
@@ -154,7 +156,7 @@ Body: {
 ### DELETE - DELETE
 
 ```
-DELETE http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOCUMENT_ID
+DELETE http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles/DOCUMENT_ID
 ```
 
 ## Query Operations
@@ -174,7 +176,7 @@ Content-Type: application/json
 ```json
 {
   "structuredQuery": {
-    "from": [{"collectionId": "COLLECTION_ID"}],
+    "from": [{"collectionId": "user_profiles"}],
     "where": {
       "fieldFilter": {
         "field": {"fieldPath": "FIELD_NAME"},
@@ -330,7 +332,7 @@ The `:runQuery` endpoint returns an array of documents in Firebase format:
 [
   {
     "document": {
-      "name": "projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/DOC_ID",
+      "name": "projects/PROJECT_ID/databases/(default)/documents/user_profiles/DOC_ID",
       "fields": {
         "fieldName": { "stringValue": "value" }
       },
@@ -353,7 +355,7 @@ Each collection has metadata stored in the `collections` collection with the fol
 ```json
 {
   "projectName": "project_database_id",
-  "collectionName": "collection_id",
+  "collectionName": "user_profiles",
   "rules": [
     {
       "match": "/documents/{document}",
@@ -385,7 +387,7 @@ Each collection has metadata stored in the `collections` collection with the fol
 #### Get Collection Metadata (Security Rules & Indexes)
 
 ```
-GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
+GET http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles/_security
 Authorization: Bearer JWT_TOKEN
 ```
 
@@ -409,7 +411,7 @@ Body: {
 #### Update Indexes
 
 ```
-PUT http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/COLLECTION_ID/_security
+PUT http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -433,7 +435,7 @@ Body: {
 #### Update Both Rules and Indexes
 
 ```
-PUT http://localhost:8000/PROJECT_id/COLLECTION_id/_security
+PUT http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/user_profiles/_security
 Authorization: Bearer JWT_TOKEN
 
 Body: {
@@ -540,6 +542,21 @@ POST http://localhost:8000/v1/projects/PROJECT_ID/regenerate-key
 Authorization: Bearer JWT_TOKEN
 ```
 
+## Collection Naming Convention
+
+⚠️ **Important**: Collection names must follow the `lowercase_with_underscores` convention:
+
+- ✅ **Valid**: `users`, `user_profiles`, `order-items`, `api_keys`
+- ❌ **Invalid**: `userProfiles`, `OrderItems`, `ApiKeys`, `Users`
+
+This ensures:
+
+- Clean, readable URLs
+- Consistency with database conventions
+- Compatibility with web standards
+
+The API will **reject requests** with collection names containing uppercase letters or camelCase.
+
 ## Path Structure
 
 The API uses Firebase-style path structure to match the Firestore REST API exactly:
@@ -550,7 +567,7 @@ The API uses Firebase-style path structure to match the Firestore REST API exact
 Where:
 
 - `PROJECT_ID` can be either the display name or database name
-- `COLLECTION_ID` maps to MongoDB collection name
+- `COLLECTION_ID` maps to MongoDB collection name (must be lowercase_with_underscores)
 - `DOCUMENT_ID` maps to document `_id` field (or `_id` for backward compatibility)
 - `(default)` is the literal string used by Firebase Firestore for the default database
 

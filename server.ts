@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import { MongoClient, ObjectId, Collection, Db } from "mongodb";
 import crypto from "crypto";
 import cors from "cors";
+import axios from "axios";
 import { authenticateToken, setupAuthRoutes } from "./auth";
 
 interface AuthenticatedRequest extends Request {
@@ -39,6 +40,29 @@ interface CollectionMetadata {
 interface IndexDefinition {
   fields: Record<string, number>;
   options?: Record<string, any>;
+}
+
+interface ServerFunction {
+  _id: string;
+  description: string;
+  implementationCode: string;
+  requiredServices: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface FunctionExecutionContext {
+  user: {
+    userId: string;
+    projectName: string;
+  };
+  project: {
+    name: string;
+  };
+}
+
+interface FunctionCallRequest {
+  data: Record<string, any>;
 }
 
 const app = express();
@@ -98,6 +122,16 @@ function isValidName(name: string): boolean {
 
   // URL-safe characters only
   return /^[a-zA-Z0-9_-]+$/.test(name);
+}
+
+function isValidCollectionName(name: string): boolean {
+  if (!name || name.length === 0 || name.length > 255) {
+    return false;
+  }
+
+  // Collection names must be lowercase with underscores/hyphens only
+  // No uppercase letters allowed to enforce lowercase_with_underscores convention
+  return /^[a-z0-9_-]+$/.test(name);
 }
 
 function isValidDocumentId(id: string): boolean {
@@ -399,6 +433,189 @@ function convertFromFirestoreFormat(firestoreDoc: any): MongoDocument {
   return mongoDoc;
 }
 
+// Helper function to get server functions collection
+function getServerFunctionsCollection(): Collection<ServerFunction> {
+  return mongoClient
+    .db("basebase")
+    .collection<ServerFunction>("server_functions");
+}
+
+// Helper function to initialize default server functions
+async function initializeDefaultServerFunctions(): Promise<void> {
+  try {
+    const functionsCollection = getServerFunctionsCollection();
+
+    // Check if functions already exist
+    const existingCount = await functionsCollection.countDocuments();
+    if (existingCount > 0) {
+      console.log("Server functions already initialized");
+      return;
+    }
+
+    const now = new Date();
+
+    // getPage function
+    const getPageFunction: ServerFunction = {
+      _id: "getPage",
+      description:
+        "Retrieves the contents of a webpage located at a URL using HTTP GET and returns them as a string. Required parameters: 'url' of type string.",
+      implementationCode: `
+        async (params, context) => {
+          if (!params.url || typeof params.url !== 'string') {
+            throw new Error('Parameter "url" is required and must be a string');
+          }
+          
+          try {
+            const response = await axios.get(params.url, {
+              timeout: 10000, // 10 second timeout
+              maxRedirects: 5,
+              headers: {
+                'User-Agent': 'BaseBase-Server/1.0'
+              }
+            });
+            
+            return {
+              success: true,
+              data: response.data,
+              status: response.status,
+              headers: response.headers,
+              url: response.config.url
+            };
+          } catch (error) {
+            if (error.response) {
+              return {
+                success: false,
+                error: 'HTTP Error: ' + error.response.status,
+                status: error.response.status,
+                data: error.response.data
+              };
+            } else if (error.request) {
+              return {
+                success: false,
+                error: 'Network Error: Could not reach the URL'
+              };
+            } else {
+              return {
+                success: false,
+                error: 'Request Error: ' + error.message
+              };
+            }
+          }
+        }
+      `,
+      requiredServices: ["axios"],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // sendSms function
+    const sendSmsFunction: ServerFunction = {
+      _id: "sendSms",
+      description:
+        "Sends an SMS message to a phone number using Twilio. Required parameters: 'to' (phone number), 'message' (text content).",
+      implementationCode: `
+        async (params, context) => {
+          if (!params.to || typeof params.to !== 'string') {
+            throw new Error('Parameter "to" is required and must be a string (phone number)');
+          }
+          
+          if (!params.message || typeof params.message !== 'string') {
+            throw new Error('Parameter "message" is required and must be a string');
+          }
+          
+          try {
+            // Note: This would require Twilio client to be available in execution context
+            // For now, we'll return a mock response
+            console.log(\`SMS would be sent to \${params.to}: \${params.message}\`);
+            
+            return {
+              success: true,
+              message: 'SMS sent successfully (mock)',
+              to: params.to,
+              messageLength: params.message.length,
+              timestamp: new Date().toISOString()
+            };
+          } catch (error) {
+            return {
+              success: false,
+              error: 'SMS Error: ' + error.message
+            };
+          }
+        }
+      `,
+      requiredServices: ["twilio"],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await functionsCollection.insertMany([getPageFunction, sendSmsFunction]);
+    console.log("Initialized default server functions: getPage, sendSms");
+  } catch (error) {
+    console.error("Failed to initialize default server functions:", error);
+  }
+}
+
+// Helper function to execute server function code safely
+async function executeServerFunction(
+  functionCode: string,
+  params: Record<string, any>,
+  context: FunctionExecutionContext,
+  requiredServices: string[]
+): Promise<any> {
+  try {
+    // Create execution sandbox with available services
+    const services: Record<string, any> = {};
+
+    // Add requested services
+    for (const service of requiredServices) {
+      switch (service) {
+        case "axios":
+          services.axios = axios;
+          break;
+        case "twilio":
+          // Note: In a production environment, you'd want to initialize Twilio client here
+          services.twilio = null; // Placeholder
+          break;
+        default:
+          console.warn(`Unknown service requested: ${service}`);
+      }
+    }
+
+    // Create the function from the code string
+    const AsyncFunction = Object.getPrototypeOf(
+      async function () {}
+    ).constructor;
+    const userFunction = new AsyncFunction(
+      "params",
+      "context",
+      "axios",
+      "twilio",
+      `
+        "use strict";
+        return (${functionCode})(params, context);
+      `
+    );
+
+    // Execute with timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Function execution timeout")), 30000); // 30 second timeout
+    });
+
+    const executionPromise = userFunction(
+      params,
+      context,
+      services.axios,
+      services.twilio
+    );
+
+    const result = await Promise.race([executionPromise, timeoutPromise]);
+    return result;
+  } catch (error) {
+    console.error("Function execution error:", error);
+    throw new Error(`Function execution failed: ${(error as Error).message}`);
+  }
+}
+
 // Helper function to convert MongoDB document to Firestore-style format
 function convertToFirestoreFormat(mongoDoc: MongoDocument): FirestoreDocument {
   const firestoreDoc: FirestoreDocument = { fields: {} };
@@ -464,6 +681,228 @@ function convertToFirestoreFormat(mongoDoc: MongoDocument): FirestoreDocument {
   return firestoreDoc;
 }
 
+// SERVER FUNCTIONS ENDPOINTS (JWT required)
+
+// LIST SERVER FUNCTIONS - GET
+app.get(
+  "/v1/functions",
+  checkConnection,
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      console.log(`[FUNCTION] GET /v1/functions`);
+      console.log(
+        `[FUNCTION] User: ${req.user!.userId}, Project: ${
+          req.user!.projectName
+        }`
+      );
+
+      const functionsCollection = getServerFunctionsCollection();
+      const functions = await functionsCollection
+        .find({}, { projection: { implementationCode: 0 } }) // Exclude implementation code from listing
+        .toArray();
+
+      console.log(`[FUNCTION] Found ${functions.length} server functions`);
+
+      res.json({
+        functions: functions.map((func) => ({
+          id: func._id,
+          description: func.description,
+          requiredServices: func.requiredServices,
+          createdAt: func.createdAt,
+          updatedAt: func.updatedAt,
+        })),
+        count: functions.length,
+      });
+    } catch (error) {
+      console.error(`[FUNCTION] Error listing functions:`, error);
+      res.status(500).json({
+        error: "Failed to list functions",
+        suggestion: "Contact support if the problem persists.",
+      });
+    }
+  }
+);
+
+// GET SPECIFIC SERVER FUNCTION - GET
+app.get(
+  "/v1/functions/:functionName",
+  checkConnection,
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { functionName } = req.params;
+
+      console.log(`[FUNCTION] GET /v1/functions/${functionName}`);
+      console.log(
+        `[FUNCTION] User: ${req.user!.userId}, Project: ${
+          req.user!.projectName
+        }`
+      );
+
+      const functionsCollection = getServerFunctionsCollection();
+      const serverFunction = await functionsCollection.findOne({
+        _id: functionName,
+      });
+
+      if (!serverFunction) {
+        console.log(`[FUNCTION] Function not found: ${functionName}`);
+        return res.status(404).json({
+          error: "Function not found",
+          suggestion: `The function '${functionName}' does not exist.`,
+        });
+      }
+
+      console.log(`[FUNCTION] Retrieved function ${functionName}`);
+
+      res.json({
+        id: serverFunction._id,
+        description: serverFunction.description,
+        implementationCode: serverFunction.implementationCode,
+        requiredServices: serverFunction.requiredServices,
+        createdAt: serverFunction.createdAt,
+        updatedAt: serverFunction.updatedAt,
+      });
+    } catch (error) {
+      console.error(`[FUNCTION] Error getting function:`, error);
+      res.status(500).json({
+        error: "Failed to get function",
+        suggestion: "Contact support if the problem persists.",
+      });
+    }
+  }
+);
+
+// CALL SERVER FUNCTION - POST (Firebase pattern with :call)
+app.post(
+  /^\/v1\/projects\/([^\/]+)\/functions\/([^\/]+):call$/,
+  checkConnection,
+  authenticateToken,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // Extract projectId and functionName from regex match
+      const match = req.path.match(
+        /^\/v1\/projects\/([^\/]+)\/functions\/([^\/]+):call$/
+      );
+      if (!match) {
+        return res.status(400).json({
+          error: "Invalid route format",
+          suggestion:
+            "Use format: /v1/projects/{projectId}/functions/{functionName}:call",
+        });
+      }
+
+      const projectId = match[1];
+      const functionName = match[2];
+      const { data } = req.body as FunctionCallRequest;
+
+      console.log(
+        `[FUNCTION] POST /v1/projects/${projectId}/functions/${functionName}:call`
+      );
+      console.log(
+        `[FUNCTION] User: ${req.user!.userId}, Project: ${
+          req.user!.projectName
+        }`
+      );
+      console.log(`[FUNCTION] Function: ${functionName}, Data:`, data);
+
+      // Resolve the requested project name to database name
+      let targetDbName: string;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectId);
+      } catch (resolveError) {
+        console.error(`[FUNCTION] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: (resolveError as Error).message,
+          suggestion: `Make sure the project '${projectId}' exists and you have access to it.`,
+        });
+      }
+
+      // Check if user has access to the project
+      if (req.user!.projectName !== targetDbName) {
+        console.error(
+          `[FUNCTION] Access denied: User project ${
+            req.user!.projectName
+          } does not match target ${targetDbName}`
+        );
+        return res.status(403).json({
+          error: "Access denied",
+          suggestion: `You can only call functions in your own project '${
+            req.user!.projectName
+          }'.`,
+        });
+      }
+
+      // Get the server function from the database
+      const functionsCollection = getServerFunctionsCollection();
+      const serverFunction = await functionsCollection.findOne({
+        _id: functionName,
+      });
+
+      if (!serverFunction) {
+        console.log(`[FUNCTION] Function not found: ${functionName}`);
+        return res.status(404).json({
+          error: "Function not found",
+          suggestion: `The function '${functionName}' does not exist. Available functions can be found in the server functions collection.`,
+        });
+      }
+
+      // Prepare execution context
+      const executionContext: FunctionExecutionContext = {
+        user: {
+          userId: req.user!.userId,
+          projectName: req.user!.projectName,
+        },
+        project: {
+          name: targetDbName,
+        },
+      };
+
+      console.log(`[FUNCTION] Executing function ${functionName}`);
+
+      // Execute the function
+      try {
+        const result = await executeServerFunction(
+          serverFunction.implementationCode,
+          data || {},
+          executionContext,
+          serverFunction.requiredServices
+        );
+
+        console.log(
+          `[FUNCTION] Function ${functionName} executed successfully`
+        );
+
+        res.json({
+          success: true,
+          result: result,
+          functionName: functionName,
+          executedAt: new Date().toISOString(),
+        });
+      } catch (executionError) {
+        console.error(
+          `[FUNCTION] Function execution failed for ${functionName}:`,
+          executionError
+        );
+        return res.status(500).json({
+          error: "Function execution failed",
+          details: (executionError as Error).message,
+          functionName: functionName,
+          suggestion:
+            "Check the function parameters and try again. Contact support if the problem persists.",
+        });
+      }
+    } catch (error) {
+      console.error(`[FUNCTION] Error calling function:`, error);
+      res.status(500).json({
+        error: "Failed to call function",
+        suggestion:
+          "Check your request format and try again. Contact support if the problem persists.",
+      });
+    }
+  }
+);
+
 // CRUD ENDPOINTS (JWT required)
 
 // CREATE - POST document (auto-generated _id ID)
@@ -474,6 +913,15 @@ app.post(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, collectionId } = req.params;
+
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
 
       console.log(
         `[CREATE] POST /v1/projects/${projectId}/databases/(default)/documents/${collectionId}`
@@ -589,6 +1037,15 @@ app.get(
     try {
       const { projectId, collectionId } = req.params;
 
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
+
       // Resolve the requested project name to database name
       let targetDbName: string;
       try {
@@ -639,6 +1096,15 @@ app.put(
     try {
       const { projectId, collectionId } = req.params;
       const { rules, indexes } = req.body;
+
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
 
       // Resolve the requested project name to database name
       let targetDbName: string;
@@ -705,6 +1171,15 @@ app.get(
     try {
       const { projectId, collectionId, documentId } = req.params;
 
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
+
       console.log(
         `[READ] GET /v1/projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
       );
@@ -763,6 +1238,15 @@ app.get(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, collectionId } = req.params;
+
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
 
       // Resolve the requested project name to database name
       let targetDbName: string;
@@ -929,6 +1413,15 @@ app.post(
         });
       }
 
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
+
       const { collection } = getDbAndCollection(targetDbName, collectionId);
 
       // Build MongoDB query from Firestore where clause
@@ -994,6 +1487,15 @@ app.patch(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, collectionId, documentId } = req.params;
+
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
 
       console.log(
         `[UPDATE] PATCH /v1/projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
@@ -1097,6 +1599,15 @@ app.put(
     try {
       const { projectId, collectionId, documentId } = req.params;
 
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
+
       console.log(
         `[SET] PUT /v1/projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
       );
@@ -1199,6 +1710,15 @@ app.delete(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, collectionId, documentId } = req.params;
+
+      // Validate collection name format
+      if (!isValidCollectionName(collectionId)) {
+        return res.status(400).json({
+          error: "Invalid collection name",
+          suggestion:
+            "Collection names must be lowercase with underscores/hyphens only (e.g., 'user_profiles', 'order-items'). No uppercase letters or camelCase allowed.",
+        });
+      }
 
       console.log(
         `[DELETE] DELETE /v1/projects/${projectId}/databases/(default)/documents/${collectionId}/${documentId}`
@@ -1312,6 +1832,9 @@ function getRouteSuggestion(method: string, path: string): string {
 async function startServer(): Promise<void> {
   await connectToMongoDB();
 
+  // Initialize default server functions
+  await initializeDefaultServerFunctions();
+
   // Setup authentication routes after MongoDB connection
   setupAuthRoutes(app, mongoClient, checkConnection);
 
@@ -1343,6 +1866,14 @@ async function startServer(): Promise<void> {
     console.log(
       `  PUT /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Update collection metadata`
     );
+    console.log(`[404] Available routes for server functions:`);
+    console.log(`  GET /v1/functions - List all server functions`);
+    console.log(
+      `  GET /v1/functions/[functionName] - Get specific function details`
+    );
+    console.log(
+      `  POST /v1/projects/[projectId]/functions/[functionName]:call - Call server function`
+    );
 
     res.status(404).json({
       error: "Route not found",
@@ -1362,6 +1893,8 @@ async function startServer(): Promise<void> {
           "GET/PUT /v1/projects/:projectId/databases/(default)/documents/:collectionId/_security",
         auth: "POST /v1/requestCode, POST /v1/verifyCode",
         projects: "GET /v1/projects, POST /v1/projects",
+        functions:
+          "GET /v1/functions, GET /v1/functions/:functionName, POST /v1/projects/:projectId/functions/:functionName:call",
       },
     });
   });
@@ -1410,6 +1943,7 @@ process.on("SIGINT", async () => {
 // Test initialization function
 async function initializeForTesting(): Promise<void> {
   await connectToMongoDB();
+  await initializeDefaultServerFunctions();
   setupAuthRoutes(app, mongoClient, checkConnection);
 }
 
@@ -1419,4 +1953,9 @@ if (process.env.NODE_ENV !== "test") {
 }
 
 // Export app and functions for testing
-export { app, startServer, initializeForTesting };
+export {
+  app,
+  startServer,
+  initializeForTesting,
+  initializeDefaultServerFunctions,
+};

@@ -233,6 +233,13 @@ export class TestHelper {
           console.log(`Dropped database: ${db.name}`);
         }
       }
+
+      // Re-initialize server functions since we dropped the basebase database
+      const serverModule = require("../dist/server.js");
+      if (typeof serverModule.initializeDefaultServerFunctions === "function") {
+        await serverModule.initializeDefaultServerFunctions();
+        console.log("Re-initialized server functions after cleanup");
+      }
     } catch (error) {
       console.error("Error cleaning up test data:", error);
     }
