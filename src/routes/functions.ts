@@ -17,15 +17,44 @@ const router = Router();
 
 // LIST ALL FUNCTIONS (GLOBAL + PROJECT) - GET
 router.get(
-  "/v1/functions",
+  "/v1/projects/:projectId/functions",
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      console.log(`[FUNCTION] GET /v1/functions`);
+      const { projectId } = req.params;
+
+      console.log(`[FUNCTION] GET /v1/projects/${projectId}/functions`);
       console.log(
         `[FUNCTION] User: ${req.user!.userId}, Project: ${
           req.user!.projectName
         }`
       );
+
+      // Resolve the requested project name to database name
+      let targetDbName: string;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectId);
+      } catch (resolveError) {
+        console.error(`[FUNCTION] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: (resolveError as Error).message,
+          suggestion: `Make sure the project '${projectId}' exists and you have access to it.`,
+        });
+      }
+
+      // Check if user has access to the project
+      if (req.user!.projectName !== targetDbName) {
+        console.error(
+          `[FUNCTION] Access denied: User project ${
+            req.user!.projectName
+          } does not match target ${targetDbName}`
+        );
+        return res.status(403).json({
+          error: "Access denied",
+          suggestion: `You can only access functions in your own project '${
+            req.user!.projectName
+          }'.`,
+        });
+      }
 
       // Get global basebase functions
       const globalFunctionsCollection = getServerFunctionsCollection();
@@ -34,9 +63,8 @@ router.get(
         .toArray();
 
       // Get project-specific functions
-      const projectFunctionsCollection = getProjectFunctionsCollection(
-        req.user!.projectName
-      );
+      const projectFunctionsCollection =
+        getProjectFunctionsCollection(targetDbName);
       const projectFunctions = await projectFunctionsCollection
         .find({}, { projection: { implementationCode: 0 } })
         .toArray();
@@ -87,22 +115,50 @@ router.get(
 
 // GET SPECIFIC FUNCTION - GET (checks both global and project functions)
 router.get(
-  "/v1/functions/:functionName",
+  "/v1/projects/:projectId/functions/:functionName",
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { functionName } = req.params;
+      const { projectId, functionName } = req.params;
 
-      console.log(`[FUNCTION] GET /v1/functions/${functionName}`);
+      console.log(
+        `[FUNCTION] GET /v1/projects/${projectId}/functions/${functionName}`
+      );
       console.log(
         `[FUNCTION] User: ${req.user!.userId}, Project: ${
           req.user!.projectName
         }`
       );
 
+      // Resolve the requested project name to database name
+      let targetDbName: string;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectId);
+      } catch (resolveError) {
+        console.error(`[FUNCTION] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: (resolveError as Error).message,
+          suggestion: `Make sure the project '${projectId}' exists and you have access to it.`,
+        });
+      }
+
+      // Check if user has access to the project
+      if (req.user!.projectName !== targetDbName) {
+        console.error(
+          `[FUNCTION] Access denied: User project ${
+            req.user!.projectName
+          } does not match target ${targetDbName}`
+        );
+        return res.status(403).json({
+          error: "Access denied",
+          suggestion: `You can only access functions in your own project '${
+            req.user!.projectName
+          }'.`,
+        });
+      }
+
       // First try project functions
-      const projectFunctionsCollection = getProjectFunctionsCollection(
-        req.user!.projectName
-      );
+      const projectFunctionsCollection =
+        getProjectFunctionsCollection(targetDbName);
       let serverFunction = await projectFunctionsCollection.findOne({
         _id: functionName,
       });
@@ -152,9 +208,10 @@ router.get(
 
 // CREATE USER FUNCTION - POST
 router.post(
-  "/v1/functions",
+  "/v1/projects/:projectId/functions",
   async (req: AuthenticatedRequest, res: Response) => {
     try {
+      const { projectId } = req.params;
       const {
         id,
         description,
@@ -180,16 +237,44 @@ router.post(
         });
       }
 
-      console.log(`[FUNCTION] POST /v1/functions - Creating function ${id}`);
+      console.log(
+        `[FUNCTION] POST /v1/projects/${projectId}/functions - Creating function ${id}`
+      );
       console.log(
         `[FUNCTION] User: ${req.user!.userId}, Project: ${
           req.user!.projectName
         }`
       );
 
-      const projectFunctionsCollection = getProjectFunctionsCollection(
-        req.user!.projectName
-      );
+      // Resolve the requested project name to database name
+      let targetDbName: string;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectId);
+      } catch (resolveError) {
+        console.error(`[FUNCTION] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: (resolveError as Error).message,
+          suggestion: `Make sure the project '${projectId}' exists and you have access to it.`,
+        });
+      }
+
+      // Check if user has access to the project
+      if (req.user!.projectName !== targetDbName) {
+        console.error(
+          `[FUNCTION] Access denied: User project ${
+            req.user!.projectName
+          } does not match target ${targetDbName}`
+        );
+        return res.status(403).json({
+          error: "Access denied",
+          suggestion: `You can only create functions in your own project '${
+            req.user!.projectName
+          }'.`,
+        });
+      }
+
+      const projectFunctionsCollection =
+        getProjectFunctionsCollection(targetDbName);
 
       // Check if function already exists
       const existingFunction = await projectFunctionsCollection.findOne({
@@ -219,9 +304,7 @@ router.post(
       await projectFunctionsCollection.insertOne(newFunction);
 
       console.log(
-        `[FUNCTION] Created user function ${id} in project ${
-          req.user!.projectName
-        }`
+        `[FUNCTION] Created user function ${id} in project ${targetDbName}`
       );
 
       res.status(201).json({
@@ -248,10 +331,10 @@ router.post(
 
 // UPDATE USER FUNCTION - PUT
 router.put(
-  "/v1/functions/:functionName",
+  "/v1/projects/:projectId/functions/:functionName",
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { functionName } = req.params;
+      const { projectId, functionName } = req.params;
       const {
         description,
         implementationCode,
@@ -260,16 +343,44 @@ router.put(
         enabled,
       } = req.body;
 
-      console.log(`[FUNCTION] PUT /v1/functions/${functionName}`);
+      console.log(
+        `[FUNCTION] PUT /v1/projects/${projectId}/functions/${functionName}`
+      );
       console.log(
         `[FUNCTION] User: ${req.user!.userId}, Project: ${
           req.user!.projectName
         }`
       );
 
-      const projectFunctionsCollection = getProjectFunctionsCollection(
-        req.user!.projectName
-      );
+      // Resolve the requested project name to database name
+      let targetDbName: string;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectId);
+      } catch (resolveError) {
+        console.error(`[FUNCTION] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: (resolveError as Error).message,
+          suggestion: `Make sure the project '${projectId}' exists and you have access to it.`,
+        });
+      }
+
+      // Check if user has access to the project
+      if (req.user!.projectName !== targetDbName) {
+        console.error(
+          `[FUNCTION] Access denied: User project ${
+            req.user!.projectName
+          } does not match target ${targetDbName}`
+        );
+        return res.status(403).json({
+          error: "Access denied",
+          suggestion: `You can only update functions in your own project '${
+            req.user!.projectName
+          }'.`,
+        });
+      }
+
+      const projectFunctionsCollection =
+        getProjectFunctionsCollection(targetDbName);
 
       // Check if function exists and belongs to user
       const existingFunction = await projectFunctionsCollection.findOne({
@@ -330,21 +441,49 @@ router.put(
 
 // DELETE USER FUNCTION - DELETE
 router.delete(
-  "/v1/functions/:functionName",
+  "/v1/projects/:projectId/functions/:functionName",
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { functionName } = req.params;
+      const { projectId, functionName } = req.params;
 
-      console.log(`[FUNCTION] DELETE /v1/functions/${functionName}`);
+      console.log(
+        `[FUNCTION] DELETE /v1/projects/${projectId}/functions/${functionName}`
+      );
       console.log(
         `[FUNCTION] User: ${req.user!.userId}, Project: ${
           req.user!.projectName
         }`
       );
 
-      const projectFunctionsCollection = getProjectFunctionsCollection(
-        req.user!.projectName
-      );
+      // Resolve the requested project name to database name
+      let targetDbName: string;
+      try {
+        targetDbName = await resolveProjectDatabaseName(projectId);
+      } catch (resolveError) {
+        console.error(`[FUNCTION] Project resolution failed:`, resolveError);
+        return res.status(404).json({
+          error: (resolveError as Error).message,
+          suggestion: `Make sure the project '${projectId}' exists and you have access to it.`,
+        });
+      }
+
+      // Check if user has access to the project
+      if (req.user!.projectName !== targetDbName) {
+        console.error(
+          `[FUNCTION] Access denied: User project ${
+            req.user!.projectName
+          } does not match target ${targetDbName}`
+        );
+        return res.status(403).json({
+          error: "Access denied",
+          suggestion: `You can only delete functions in your own project '${
+            req.user!.projectName
+          }'.`,
+        });
+      }
+
+      const projectFunctionsCollection =
+        getProjectFunctionsCollection(targetDbName);
 
       const result = await projectFunctionsCollection.deleteOne({
         _id: functionName,
@@ -392,6 +531,16 @@ router.post(
 
       const projectId = match[1];
       const functionName = match[2];
+
+      // Validate JSON body structure
+      if (!req.body || typeof req.body !== "object") {
+        return res.status(400).json({
+          error: "Invalid request format",
+          suggestion:
+            "Request body must be valid JSON with optional 'data' field",
+        });
+      }
+
       const { data } = req.body as FunctionCallRequest;
 
       console.log(
@@ -450,7 +599,7 @@ router.post(
         console.log(`[FUNCTION] Function not found: ${functionName}`);
         return res.status(404).json({
           error: "Function not found",
-          suggestion: `The function '${functionName}' does not exist. Available functions can be found by calling GET /v1/functions.`,
+          suggestion: `The function '${functionName}' does not exist. Available functions can be found by calling GET /v1/projects/{projectId}/functions.`,
         });
       }
 

@@ -589,21 +589,36 @@ curl -X POST http://localhost:8000/v1/functions \
 **List All Functions (Built-in + User):**
 
 ```bash
-curl http://localhost:8000/v1/functions \
+curl http://localhost:8000/v1/projects/PROJECT_ID/functions \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
 **Get Function Details:**
 
 ```bash
-curl http://localhost:8000/v1/functions/FUNCTION_NAME \
+curl http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Create Function:**
+
+```bash
+curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/functions \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "myFunction",
+    "description": "My custom function",
+    "implementationCode": "async (params, context) => { return { result: \"Hello World\" }; }",
+    "schedule": "0 */2 * * *",
+    "enabled": true
+  }'
 ```
 
 **Update Function:**
 
 ```bash
-curl -X PUT http://localhost:8000/v1/functions/FUNCTION_NAME \
+curl -X PUT http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -617,7 +632,7 @@ curl -X PUT http://localhost:8000/v1/functions/FUNCTION_NAME \
 **Delete Function:**
 
 ```bash
-curl -X DELETE http://localhost:8000/v1/functions/FUNCTION_NAME \
+curl -X DELETE http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 

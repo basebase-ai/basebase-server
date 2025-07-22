@@ -45,7 +45,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(response.status).toBe(201);
@@ -91,7 +91,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(response.status).toBe(201);
@@ -129,7 +129,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(response.status).toBe(201);
@@ -149,7 +149,7 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       // Update the function
@@ -162,7 +162,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .put("/v1/functions/testFunction")
+        .put("/v1/projects/test-project/functions/testFunction")
         .send(updateData);
 
       expect(response.status).toBe(200);
@@ -182,13 +182,13 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       // Delete the function
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .delete("/v1/functions/tempFunction");
+        .delete("/v1/projects/test-project/functions/tempFunction");
 
       expect(response.status).toBe(200);
       expect(response.body.message).toBe("Function deleted successfully");
@@ -196,7 +196,7 @@ describe("User-Defined Functions Tests", () => {
       // Verify it's deleted
       const getResponse = await testHelper
         .authenticatedRequest(userToken)
-        .get("/v1/functions/tempFunction");
+        .get("/v1/projects/test-project/functions/tempFunction");
 
       expect(getResponse.status).toBe(404);
     });
@@ -211,13 +211,13 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       // List all functions
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .get("/v1/functions");
+        .get("/v1/projects/test-project/functions");
 
       expect(response.status).toBe(200);
       expect(response.body.functions).toBeDefined();
@@ -251,7 +251,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response1 = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(invalidData1);
 
       expect(response1.status).toBe(400);
@@ -266,7 +266,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response2 = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(invalidData2);
 
       expect(response2.status).toBe(400);
@@ -283,7 +283,7 @@ describe("User-Defined Functions Tests", () => {
       // Create first function
       const response1 = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(response1.status).toBe(201);
@@ -291,7 +291,7 @@ describe("User-Defined Functions Tests", () => {
       // Try to create duplicate
       const response2 = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(response2.status).toBe(409);
@@ -308,13 +308,13 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       // Verify the function exists for user 1
       const getResponse = await testHelper
         .authenticatedRequest(userToken)
-        .get("/v1/functions/user1Function");
+        .get("/v1/projects/test-project/functions/user1Function");
 
       expect(getResponse.status).toBe(200);
       expect(getResponse.body.id).toBe("user1Function");
@@ -324,7 +324,7 @@ describe("User-Defined Functions Tests", () => {
       // This is enforced by project-level database isolation
       const listResponse = await testHelper
         .authenticatedRequest(userToken)
-        .get("/v1/functions");
+        .get("/v1/projects/test-project/functions");
 
       expect(listResponse.status).toBe(200);
 
@@ -377,7 +377,7 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
     });
 
@@ -575,7 +575,7 @@ describe("User-Defined Functions Tests", () => {
       // Create the function
       const createResponse = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(createResponse.status).toBe(201);
@@ -656,7 +656,7 @@ describe("User-Defined Functions Tests", () => {
       // Create the function
       const createResponse = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(createResponse.status).toBe(201);
@@ -721,7 +721,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(response.status).toBe(201);
@@ -770,7 +770,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(response.status).toBe(201);
@@ -813,7 +813,7 @@ describe("User-Defined Functions Tests", () => {
 
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       expect(response.status).toBe(201);
@@ -832,13 +832,13 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       // Disable the function
       const updateResponse = await testHelper
         .authenticatedRequest(userToken)
-        .put("/v1/functions/testScheduled")
+        .put("/v1/projects/test-project/functions/testScheduled")
         .send({
           enabled: false,
         });
@@ -860,13 +860,13 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       // Update to different schedule
       const updateResponse = await testHelper
         .authenticatedRequest(userToken)
-        .put("/v1/functions/flexibleSchedule")
+        .put("/v1/projects/test-project/functions/flexibleSchedule")
         .send({
           schedule: "0 */1 * * *", // Change to hourly
         });
@@ -887,13 +887,13 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       // Remove schedule by setting it to null
       const updateResponse = await testHelper
         .authenticatedRequest(userToken)
-        .put("/v1/functions/removeSchedule")
+        .put("/v1/projects/test-project/functions/removeSchedule")
         .send({
           schedule: null, // Remove schedule
         });
@@ -922,7 +922,7 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       const response = await testHelper
@@ -952,7 +952,7 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       const response = await testHelper
@@ -981,7 +981,7 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       const response = await testHelper
@@ -1011,7 +1011,7 @@ describe("User-Defined Functions Tests", () => {
 
       await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/functions")
+        .post("/v1/projects/test-project/functions")
         .send(functionData);
 
       const response = await testHelper

@@ -61,18 +61,18 @@ export class TestHelper {
       console.log("Test client connected to MongoDB Memory Server");
 
       // Clear the require cache to ensure fresh imports
-      const serverPath = require.resolve("../dist/server.js");
+      const serverPath = require.resolve("../dist/src/server-modular.js");
       console.log("Server path resolved to:", serverPath);
       delete require.cache[serverPath];
 
       try {
-        delete require.cache[require.resolve("../server.ts")];
+        delete require.cache[require.resolve("../src/server-modular.ts")];
       } catch (e) {
-        // Ignore if server.ts can't be resolved
+        // Ignore if server-modular.ts can't be resolved
       }
 
       // Import the server from compiled JavaScript
-      const serverModule = require("../dist/server.js");
+      const serverModule = require("../dist/src/server-modular.js");
       console.log("Server module keys:", Object.keys(serverModule));
       this.app = serverModule.app;
 
@@ -235,7 +235,7 @@ export class TestHelper {
       }
 
       // Re-initialize server functions since we dropped the basebase database
-      const serverModule = require("../dist/server.js");
+      const serverModule = require("../dist/src/server-modular.js");
       if (typeof serverModule.initializeDefaultServerFunctions === "function") {
         await serverModule.initializeDefaultServerFunctions();
         console.log("Re-initialized server functions after cleanup");

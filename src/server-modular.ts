@@ -7,9 +7,12 @@ import {
   connectToMongoDB,
   checkConnection,
   closeConnection,
+  getMongoClient,
 } from "./database/connection";
 import { setupRoutes } from "./routes";
 import { authenticateToken, setupAuthRoutes } from "../auth";
+import { initializeDefaultServerFunctions } from "./functions/initialization";
+import { SimpleScheduler } from "./functions/scheduler";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -25,17 +28,17 @@ async function startServer(): Promise<void> {
     await connectToMongoDB();
     console.log("✅ Database connected");
 
-    // 2. Initialize default server functions (TODO: move to functions/initialization.ts)
-    // await initializeDefaultServerFunctions();
+    // 2. Initialize default server functions
+    await initializeDefaultServerFunctions();
     console.log("✅ Default functions initialized");
 
-    // 3. Start scheduler (TODO: move to functions/scheduler.ts)
-    // const scheduler = SimpleScheduler.getInstance();
-    // scheduler.start();
+    // 3. Start scheduler
+    const scheduler = SimpleScheduler.getInstance();
+    scheduler.start();
     console.log("✅ Function scheduler started");
 
     // 4. Setup authentication routes
-    setupAuthRoutes(app, null!, checkConnection); // TODO: fix mongoClient dependency
+    setupAuthRoutes(app, getMongoClient(), checkConnection);
     console.log("✅ Auth routes configured");
 
     // 5. Setup all API routes (modular!)
@@ -43,7 +46,15 @@ async function startServer(): Promise<void> {
     console.log("✅ All API routes configured");
 
     // 6. Global error handler
-    app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
+    app.use((error: any, req: Request, res: Response, next: NextFunction) => {
+      // Handle JSON parsing errors
+      if (error instanceof SyntaxError && error.message.includes("JSON")) {
+        return res.status(400).json({
+          error: "Invalid JSON format",
+          suggestion: "Please check your request body contains valid JSON",
+        });
+      }
+
       console.error(`[ERROR] ${req.method} ${req.path}:`, error);
       res.status(500).json({
         error: "Internal server error",
@@ -76,9 +87,9 @@ function getLinesOfCode(): number {
 process.on("SIGINT", async () => {
   console.log("\n🛑 Shutting down server...");
 
-  // Stop scheduler (TODO: uncomment when scheduler is modularized)
-  // const scheduler = SimpleScheduler.getInstance();
-  // scheduler.stop();
+  // Stop scheduler
+  const scheduler = SimpleScheduler.getInstance();
+  scheduler.stop();
 
   // Close database connection
   await closeConnection();
@@ -87,8 +98,39 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
+// Test initialization function
+async function initializeForTesting(): Promise<void> {
+  await connectToMongoDB();
+  await initializeDefaultServerFunctions();
+  setupAuthRoutes(app, getMongoClient(), checkConnection);
+  setupRoutes(app);
+
+  // Add error handling for tests
+  app.use((error: any, req: Request, res: Response, next: NextFunction) => {
+    // Handle JSON parsing errors
+    if (error instanceof SyntaxError && error.message.includes("JSON")) {
+      return res.status(400).json({
+        error: "Invalid JSON format",
+        suggestion: "Please check your request body contains valid JSON",
+      });
+    }
+
+    console.error(`[ERROR] ${req.method} ${req.path}:`, error);
+    res.status(500).json({
+      error: "Internal server error",
+      suggestion:
+        "An unexpected error occurred. Please try again or contact support.",
+    });
+  });
+}
+
 // Export for testing
-export { app, startServer };
+export {
+  app,
+  startServer,
+  initializeForTesting,
+  initializeDefaultServerFunctions,
+};
 
 // Only start server if not in test environment
 if (process.env.NODE_ENV !== "test") {

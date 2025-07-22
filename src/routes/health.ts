@@ -82,9 +82,18 @@ export function create404Handler() {
       `  PUT /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Update collection metadata`
     );
     console.log(`[404] Available routes for server functions:`);
-    console.log(`  GET /v1/functions - List all server functions`);
     console.log(
-      `  GET /v1/functions/[functionName] - Get specific function details`
+      `  GET /v1/projects/[projectId]/functions - List all server functions`
+    );
+    console.log(
+      `  GET /v1/projects/[projectId]/functions/[functionName] - Get specific function details`
+    );
+    console.log(`  POST /v1/projects/[projectId]/functions - Create function`);
+    console.log(
+      `  PUT /v1/projects/[projectId]/functions/[functionName] - Update function`
+    );
+    console.log(
+      `  DELETE /v1/projects/[projectId]/functions/[functionName] - Delete function`
     );
     console.log(
       `  POST /v1/projects/[projectId]/functions/[functionName]:call - Call server function`
@@ -109,7 +118,7 @@ export function create404Handler() {
         auth: "POST /v1/requestCode, POST /v1/verifyCode",
         projects: "GET /v1/projects, POST /v1/projects",
         functions:
-          "GET /v1/functions, GET /v1/functions/:functionName, POST /v1/projects/:projectId/functions/:functionName:call",
+          "GET /v1/projects/:projectId/functions, GET /v1/projects/:projectId/functions/:functionName, POST /v1/projects/:projectId/functions, PUT /v1/projects/:projectId/functions/:functionName, DELETE /v1/projects/:projectId/functions/:functionName, POST /v1/projects/:projectId/functions/:functionName:call",
       },
     });
   };

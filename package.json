@@ -2,10 +2,10 @@
   "name": "basebase-server",
   "version": "1.0.0",
   "description": "A simple backend service that provides a Firestore-like API using MongoDB as the underlying database.",
-  "main": "dist/server.js",
+  "main": "dist/src/server-modular.js",
   "scripts": {
-    "start": "node dist/server.js",
-    "dev": "npx ts-node server.ts",
+    "start": "node dist/src/server-modular.js",
+    "dev": "npx ts-node src/server-modular.ts",
     "build": "tsc",
     "test": "npm run build && jest --runInBand --detectOpenHandles --forceExit",
     "test:auth": "npm run build && jest __tests__/auth-flow.test.ts --runInBand --detectOpenHandles --forceExit",

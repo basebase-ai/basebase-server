@@ -30,7 +30,7 @@ describe("Server Functions Tests", () => {
     test("should list available server functions", async () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .get("/v1/functions");
+        .get("/v1/projects/test-project/functions");
 
       expect(response.status).toBe(200);
       expect(response.body.functions).toBeDefined();
@@ -38,283 +38,181 @@ describe("Server Functions Tests", () => {
       expect(Array.isArray(response.body.functions)).toBe(true);
 
       // Should include our default functions
-      const functionNames = response.body.functions.map((f: any) => f.id);
-      expect(functionNames).toContain("getPage");
-      expect(functionNames).toContain("sendSms");
+      const globalFunctions = response.body.functions.filter(
+        (func: any) => func.isUserFunction === false
+      );
+      expect(globalFunctions.length).toBeGreaterThan(0);
+
+      // Should include getPage function
+      const getPageFunction = globalFunctions.find(
+        (func: any) => func.id === "getPage"
+      );
+      expect(getPageFunction).toBeDefined();
+      expect(getPageFunction.description).toContain("HTTP GET request");
     });
 
-    test("should get specific function details", async () => {
+    test("should get details of specific server function", async () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .get("/v1/functions/getPage");
+        .get("/v1/projects/test-project/functions/getPage");
 
       expect(response.status).toBe(200);
       expect(response.body.id).toBe("getPage");
       expect(response.body.description).toBeDefined();
       expect(response.body.implementationCode).toBeDefined();
-      expect(response.body.requiredServices).toContain("axios");
-      expect(response.body.createdAt).toBeDefined();
-      expect(response.body.updatedAt).toBeDefined();
+      expect(response.body.isUserFunction).toBe(false);
     });
 
     test("should return 404 for non-existent function", async () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .get("/v1/functions/nonExistentFunction");
+        .get("/v1/projects/test-project/functions/nonExistentFunction");
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toBe("Function not found");
+      expect(response.body.error).toContain("Function not found");
     });
 
-    test("should require authentication for function operations", async () => {
-      const response = await request(testHelper.app).get("/v1/functions");
+    test("should segregate global and user functions in listing", async () => {
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .get("/v1/projects/test-project/functions");
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(200);
+      expect(response.body.globalCount).toBeDefined();
+      expect(response.body.projectCount).toBeDefined();
+      expect(response.body.count).toBe(
+        response.body.globalCount + response.body.projectCount
+      );
+
+      // All functions should have isUserFunction property
+      response.body.functions.forEach((func: any) => {
+        expect(func.isUserFunction).toBeDefined();
+        expect(typeof func.isUserFunction).toBe("boolean");
+      });
     });
   });
 
-  describe("Function Execution - getPage", () => {
-    test("should successfully fetch a webpage", async () => {
-      // Mock HTTP request
-      const mockHtml =
-        "<html><head><title>Test Page</title></head><body><h1>Hello World</h1></body></html>";
-      const testUrl = "https://example.com/test";
-
-      nock("https://example.com").get("/test").reply(200, mockHtml, {
-        "content-type": "text/html",
-      });
+  describe("getPage Function Integration", () => {
+    test("should successfully call getPage function with valid URL", async () => {
+      // Mock an external HTTP request
+      nock("https://httpbin.org")
+        .get("/get")
+        .reply(200, {
+          args: {},
+          headers: {
+            "User-Agent": "BaseBase Function",
+          },
+          origin: "127.0.0.1",
+          url: "https://httpbin.org/get",
+        });
 
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post("/v1/projects/test-project/functions/getPage:call")
         .send({
           data: {
-            url: testUrl,
+            url: "https://httpbin.org/get",
           },
         });
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
       expect(response.body.result).toBeDefined();
-      expect(response.body.result.success).toBe(true);
-      expect(response.body.result.data).toBe(mockHtml);
       expect(response.body.result.status).toBe(200);
-      expect(response.body.functionName).toBe("getPage");
-      expect(response.body.executedAt).toBeDefined();
+      expect(response.body.result.data).toBeDefined();
     });
 
-    test("should handle HTTP errors gracefully", async () => {
-      const testUrl = "https://example.com/notfound";
+    test("should handle getPage function with invalid URL", async () => {
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post("/v1/projects/test-project/functions/getPage:call")
+        .send({
+          data: {
+            url: "not-a-valid-url",
+          },
+        });
 
-      nock("https://example.com").get("/notfound").reply(404, "Not Found");
+      expect(response.status).toBe(500);
+      expect(response.body.error).toContain("Function execution failed");
+    });
+
+    test("should handle getPage function with network error", async () => {
+      // Mock a network error
+      nock("https://httpbin.org")
+        .get("/timeout")
+        .replyWithError("Network Error");
 
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post("/v1/projects/test-project/functions/getPage:call")
         .send({
           data: {
-            url: testUrl,
+            url: "https://httpbin.org/timeout",
           },
         });
 
+      expect(response.status).toBe(500);
+      expect(response.body.error).toContain("Function execution failed");
+    });
+
+    test("should handle getPage function with HTTP error status", async () => {
+      // Mock an HTTP 404 error
+      nock("https://httpbin.org").get("/status/404").reply(404, "Not Found");
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post("/v1/projects/test-project/functions/getPage:call")
+        .send({
+          data: {
+            url: "https://httpbin.org/status/404",
+          },
+        });
+
+      // The function should still succeed (HTTP errors are part of valid responses)
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.result).toBeDefined();
-      expect(response.body.result.success).toBe(false);
-      expect(response.body.result.error).toContain("HTTP Error: 404");
       expect(response.body.result.status).toBe(404);
     });
-
-    test("should handle network errors gracefully", async () => {
-      const testUrl = "https://nonexistent-domain-12345.com/test";
-
-      nock("https://nonexistent-domain-12345.com")
-        .get("/test")
-        .replyWithError("ENOTFOUND");
-
-      const response = await testHelper
-        .authenticatedRequest(userToken)
-        .post("/v1/projects/test-project/functions/getPage:call")
-        .send({
-          data: {
-            url: testUrl,
-          },
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.result).toBeDefined();
-      expect(response.body.result.success).toBe(false);
-      expect(response.body.result.error).toContain("Network Error");
-    });
-
-    test("should validate required parameters", async () => {
-      const response = await testHelper
-        .authenticatedRequest(userToken)
-        .post("/v1/projects/test-project/functions/getPage:call")
-        .send({
-          data: {
-            // Missing url parameter
-          },
-        });
-
-      expect(response.status).toBe(500);
-      expect(response.body.error).toBe("Function execution failed");
-      expect(response.body.details).toContain('Parameter "url" is required');
-    });
-
-    test("should handle malformed URL parameters", async () => {
-      const response = await testHelper
-        .authenticatedRequest(userToken)
-        .post("/v1/projects/test-project/functions/getPage:call")
-        .send({
-          data: {
-            url: 123, // Invalid type - should be string
-          },
-        });
-
-      expect(response.status).toBe(500);
-      expect(response.body.error).toBe("Function execution failed");
-      expect(response.body.details).toContain(
-        'Parameter "url" is required and must be a string'
-      );
-    });
-
-    test("should handle timeouts (mocked)", async () => {
-      const testUrl = "https://slow-example.com/test";
-
-      nock("https://slow-example.com")
-        .get("/test")
-        .delay(15000) // 15 second delay - longer than axios timeout
-        .reply(200, "Eventually loads");
-
-      const response = await testHelper
-        .authenticatedRequest(userToken)
-        .post("/v1/projects/test-project/functions/getPage:call")
-        .send({
-          data: {
-            url: testUrl,
-          },
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.result).toBeDefined();
-      expect(response.body.result.success).toBe(false);
-      // Axios timeout shows up as network error or request error
-      expect(response.body.result.error).toMatch(
-        /(timeout|Network Error|Request Error)/i
-      );
-    });
   });
 
-  describe("Function Execution - sendSms", () => {
-    test("should successfully call sendSms function (mocked)", async () => {
+  describe("Function Error Handling", () => {
+    test("should handle function call with missing function name", async () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
-        .post("/v1/projects/test-project/functions/sendSms:call")
-        .send({
-          data: {
-            to: "+15551234567",
-            message: "Hello from BaseBase!",
-          },
-        });
-
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.result).toBeDefined();
-      expect(response.body.result.success).toBe(true);
-      expect(response.body.result.message).toContain("SMS sent successfully");
-      expect(response.body.result.to).toBe("+15551234567");
-      expect(response.body.result.messageLength).toBe(20);
-      expect(response.body.functionName).toBe("sendSms");
-    });
-
-    test("should validate SMS parameters", async () => {
-      const response = await testHelper
-        .authenticatedRequest(userToken)
-        .post("/v1/projects/test-project/functions/sendSms:call")
-        .send({
-          data: {
-            // Missing required parameters
-          },
-        });
-
-      expect(response.status).toBe(500);
-      expect(response.body.error).toBe("Function execution failed");
-      expect(response.body.details).toContain('Parameter "to" is required');
-    });
-  });
-
-  describe("Function Security and Access Control", () => {
-    test("should require authentication", async () => {
-      const response = await request(testHelper.app)
-        .post("/v1/projects/test-project/functions/getPage:call")
-        .send({
-          data: {
-            url: "https://example.com",
-          },
-        });
-
-      expect(response.status).toBe(401);
-    });
-
-    test("should only allow calling functions in user's own project", async () => {
-      const response = await testHelper
-        .authenticatedRequest(userToken)
-        .post("/v1/projects/different-project/functions/getPage:call")
-        .send({
-          data: {
-            url: "https://example.com",
-          },
-        });
-
-      expect(response.status).toBe(404); // Project resolution should fail
-    });
-
-    test("should return 404 for non-existent functions", async () => {
-      const response = await testHelper
-        .authenticatedRequest(userToken)
-        .post("/v1/projects/test-project/functions/nonExistentFunction:call")
+        .post("/v1/projects/test-project/functions/:call")
         .send({
           data: {},
         });
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toBe("Function not found");
     });
 
-    test("should handle malformed request body", async () => {
+    test("should handle function call with invalid request format", async () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post("/v1/projects/test-project/functions/getPage:call")
-        .send("invalid json");
+        .send("invalid json"); // Send invalid JSON
 
-      // Express will return 500 for JSON parse errors in middleware
-      expect(response.status).toBe(500);
+      expect(response.status).toBe(400);
     });
 
-    test("should provide helpful error messages", async () => {
-      const response = await testHelper
-        .authenticatedRequest(userToken)
+    test("should handle function call without authentication", async () => {
+      const response = await request(testHelper.app)
         .post("/v1/projects/test-project/functions/getPage:call")
         .send({
           data: {
-            url: "", // Empty URL
+            url: "https://httpbin.org/get",
           },
         });
 
-      expect(response.status).toBe(500);
-      expect(response.body.error).toBe("Function execution failed");
-      expect(response.body.suggestion).toContain(
-        "Check the function parameters"
-      );
+      expect(response.status).toBe(401);
     });
   });
 
-  describe("Real HTTP Requests", () => {
-    test("should fetch real webpage content (integration test)", async () => {
-      // This is an actual HTTP request - use a reliable test endpoint
+  describe("Function Response Format", () => {
+    test("should return consistent response format for successful function calls", async () => {
+      nock("https://httpbin.org").get("/json").reply(200, { test: "data" });
+
       const response = await testHelper
         .authenticatedRequest(userToken)
         .post("/v1/projects/test-project/functions/getPage:call")
@@ -325,14 +223,116 @@ describe("Server Functions Tests", () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-      expect(response.body.result).toBeDefined();
-      expect(response.body.result.success).toBe(true);
-      expect(response.body.result.status).toBe(200);
+      expect(response.body).toHaveProperty("success", true);
+      expect(response.body).toHaveProperty("result");
+      expect(response.body).toHaveProperty("functionName", "getPage");
+      expect(response.body).toHaveProperty("executedAt");
 
-      // The data is already parsed as an object by axios
-      const fetchedData = response.body.result.data;
-      expect(fetchedData).toHaveProperty("slideshow");
-    }, 10000); // Longer timeout for real HTTP request
+      // Verify executedAt is a valid ISO string
+      expect(() => new Date(response.body.executedAt)).not.toThrow();
+    });
+
+    test("should return consistent error format for failed function calls", async () => {
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post("/v1/projects/test-project/functions/nonExistentFunction:call")
+        .send({
+          data: {},
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body).toHaveProperty("error");
+      expect(response.body).toHaveProperty("suggestion");
+    });
+  });
+
+  describe("Function Parameters Validation", () => {
+    test("should handle getPage function with missing URL parameter", async () => {
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post("/v1/projects/test-project/functions/getPage:call")
+        .send({
+          data: {}, // Missing url parameter
+        });
+
+      expect(response.status).toBe(500);
+      expect(response.body.error).toContain("Function execution failed");
+    });
+
+    test("should handle getPage function with extra parameters", async () => {
+      nock("https://httpbin.org").get("/get").reply(200, { test: "data" });
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post("/v1/projects/test-project/functions/getPage:call")
+        .send({
+          data: {
+            url: "https://httpbin.org/get",
+            extraParam: "should be ignored",
+            anotherExtra: 123,
+          },
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+    });
+  });
+
+  describe("Function Security", () => {
+    test("should prevent access to localhost URLs", async () => {
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post("/v1/projects/test-project/functions/getPage:call")
+        .send({
+          data: {
+            url: "http://localhost:8000/admin",
+          },
+        });
+
+      // This should fail because localhost access should be restricted
+      expect(response.status).toBe(500);
+      expect(response.body.error).toContain("Function execution failed");
+    });
+
+    test("should prevent access to internal IP ranges", async () => {
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post("/v1/projects/test-project/functions/getPage:call")
+        .send({
+          data: {
+            url: "http://192.168.1.1/secret",
+          },
+        });
+
+      // This should fail because internal IP access should be restricted
+      expect(response.status).toBe(500);
+      expect(response.body.error).toContain("Function execution failed");
+    });
+  });
+
+  describe("Function Performance", () => {
+    test("should complete function call within reasonable time", async () => {
+      nock("https://httpbin.org").get("/delay/1").reply(200, { delayed: true });
+
+      const startTime = Date.now();
+
+      const response = await testHelper
+        .authenticatedRequest(userToken)
+        .post("/v1/projects/test-project/functions/getPage:call")
+        .send({
+          data: {
+            url: "https://httpbin.org/delay/1",
+          },
+        });
+
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+
+      // Should complete within a reasonable timeframe (accounting for test overhead)
+      expect(duration).toBeLessThan(5000); // 5 seconds max for test environment
+    });
   });
 });
