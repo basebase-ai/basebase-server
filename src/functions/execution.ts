@@ -1,5 +1,6 @@
 import axios from "axios";
 import { FunctionExecutionContext } from "../types/functions";
+import { getTwilioClient, getTwilioPhoneNumber } from "../services/twilio";
 
 // Helper function to execute server function code safely
 export async function executeServerFunction(
@@ -19,8 +20,7 @@ export async function executeServerFunction(
           services.axios = axios;
           break;
         case "twilio":
-          // Note: In a production environment, you'd want to initialize Twilio client here
-          services.twilio = null; // Placeholder
+          services.twilio = getTwilioClient();
           break;
         default:
           console.warn(`Unknown service requested: ${service}`);
@@ -36,6 +36,7 @@ export async function executeServerFunction(
       "context",
       "axios",
       "twilio",
+      "getTwilioPhoneNumber",
       `
         "use strict";
         return (${functionCode})(params, context);
@@ -51,7 +52,8 @@ export async function executeServerFunction(
       params,
       context,
       services.axios,
-      services.twilio
+      services.twilio,
+      getTwilioPhoneNumber
     );
 
     const result = await Promise.race([executionPromise, timeoutPromise]);

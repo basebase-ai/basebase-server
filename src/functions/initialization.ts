@@ -89,7 +89,7 @@ export async function initializeDefaultServerFunctions(): Promise<void> {
       description:
         "Sends an SMS message to a phone number using Twilio. Required parameters: 'to' (phone number), 'message' (text content).",
       implementationCode: `
-        async (params, context) => {
+        async (params, context, axios, twilio, getTwilioPhoneNumber) => {
           if (!params.to || typeof params.to !== 'string') {
             throw new Error('Parameter "to" is required and must be a string (phone number)');
           }
@@ -99,18 +99,43 @@ export async function initializeDefaultServerFunctions(): Promise<void> {
           }
           
           try {
-            // Note: This would require Twilio client to be available in execution context
-            // For now, we'll return a mock response
-            console.log('SMS would be sent to ' + params.to + ': ' + params.message);
+            // Check if Twilio is available
+            if (!twilio) {
+              console.log('Twilio not configured - SMS would be sent to ' + params.to + ': ' + params.message);
+              return {
+                success: true,
+                message: 'SMS sent successfully (mock - Twilio not configured)',
+                to: params.to,
+                messageLength: params.message.length,
+                timestamp: new Date().toISOString()
+              };
+            }
+            
+            // Get the configured Twilio phone number
+            const fromNumber = getTwilioPhoneNumber();
+            if (!fromNumber) {
+              throw new Error('TWILIO_PHONE_NUMBER not configured');
+            }
+            
+            // Send SMS using Twilio
+            const message = await twilio.messages.create({
+              body: params.message,
+              from: fromNumber,
+              to: params.to
+            });
+            
+            console.log('✅ SMS sent successfully via Twilio, SID:', message.sid);
             
             return {
               success: true,
-              message: 'SMS sent successfully (mock)',
+              message: 'SMS sent successfully via Twilio',
               to: params.to,
               messageLength: params.message.length,
+              sid: message.sid,
               timestamp: new Date().toISOString()
             };
           } catch (error) {
+            console.error('❌ SMS Error:', error);
             return {
               success: false,
               error: 'SMS Error: ' + error.message

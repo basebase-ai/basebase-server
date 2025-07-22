@@ -34,7 +34,7 @@
    - Whitelist your IP address
    - Copy the connection string to your `.env` file
 
-4. **Configure Twilio SMS (for phone verification):**
+4. **Configure Twilio SMS (for phone verification AND server functions):**
 
    - Sign up for a Twilio account at https://www.twilio.com
    - Get your Account SID and Auth Token from the Twilio Console
@@ -43,6 +43,8 @@
      - `TWILIO_ACCOUNT_SID` - Your Twilio Account SID
      - `TWILIO_AUTH_TOKEN` - Your Twilio Auth Token
      - `TWILIO_PHONE_NUMBER` - Your Twilio phone number (format: +1234567890)
+
+   **Note:** These credentials are used for both user authentication SMS and the `basebase/sendSms()` server function.
 
 5. **Start the server:**
 

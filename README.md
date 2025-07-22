@@ -426,12 +426,24 @@ curl -X POST http://localhost:8000/v1/projects/my-project/functions/getPage:call
 
 #### sendSms()
 
-Sends an SMS message using Twilio.
+Sends an SMS message using Twilio. **✅ Fully integrated and working!**
 
 **Required Parameters:**
 
 - `to` (string): Phone number in format +1234567890
 - `message` (string): Text message content
+
+**Setup Requirements:**
+Configure these environment variables in your `.env` file:
+
+- `TWILIO_ACCOUNT_SID`: Your Twilio Account SID
+- `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
+- `TWILIO_PHONE_NUMBER`: Your Twilio phone number (format: +1234567890)
+
+**Behavior:**
+
+- When Twilio is configured: Sends real SMS and returns Twilio message SID
+- When not configured: Returns mock response (useful for development/testing)
 
 **Example:**
 
@@ -454,14 +466,21 @@ curl -X POST http://localhost:8000/v1/projects/my-project/functions/sendSms:call
   "success": true,
   "result": {
     "success": true,
-    "message": "SMS sent successfully",
+    "message": "SMS sent successfully via Twilio",
     "to": "+1234567890",
     "messageLength": 20,
+    "sid": "SM1234567890abcdef1234567890abcdef",
     "timestamp": "2024-01-01T00:00:00.000Z"
   },
   "functionName": "sendSms",
   "executedAt": "2024-01-01T00:00:00.000Z"
 }
+```
+
+**Test SMS Integration:**
+
+```bash
+npm run test-twilio
 ```
 
 ### User-Defined Functions
