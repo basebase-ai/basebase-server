@@ -37,6 +37,7 @@ export interface Trigger {
   taskId: string;
   triggerType: TriggerType;
   config: TriggerConfig;
+  taskParams?: Record<string, any>; // Parameters to pass to the task when triggered
   enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +50,7 @@ export interface CreateTriggerRequest {
   taskId: string;
   triggerType: TriggerType;
   config: TriggerConfig;
+  taskParams?: Record<string, any>; // Parameters to pass to the task when triggered
   enabled?: boolean;
   description?: string;
 }
@@ -57,6 +59,7 @@ export interface UpdateTriggerRequest {
   taskId?: string;
   triggerType?: TriggerType;
   config?: Partial<TriggerConfig>;
+  taskParams?: Record<string, any>;
   enabled?: boolean;
   description?: string;
 }
@@ -66,6 +69,7 @@ export interface TriggerResponse {
   taskId: string;
   triggerType: TriggerType;
   config: TriggerConfig;
+  taskParams?: Record<string, any>;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;

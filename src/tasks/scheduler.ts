@@ -180,10 +180,10 @@ export class SimpleScheduler {
         tasks: tasksAPI,
       } as TaskExecutionContext;
 
-      // Execute the task
+      // Execute the task with trigger parameters
       const result = await executeCloudTask(
         task.implementationCode,
-        {}, // No parameters for scheduled execution
+        trigger.taskParams || {}, // Use trigger parameters or empty object
         executionContext,
         task.requiredServices
       );

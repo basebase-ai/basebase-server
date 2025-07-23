@@ -843,6 +843,7 @@ Content-Type: application/json
 
 **Optional Fields:**
 
+- `taskParams` (object): Parameters to pass to the task when triggered (default: `{}`)
 - `enabled` (boolean): Whether the trigger is active (default: `true`)
 - `description` (string): Human-readable description
 
@@ -860,8 +861,13 @@ Execute tasks on a schedule using cron expressions:
     "schedule": "0 2 * * *",
     "timezone": "UTC"
   },
+  "taskParams": {
+    "maxAge": 30,
+    "batchSize": 1000,
+    "notifyEmail": "admin@example.com"
+  },
   "enabled": true,
-  "description": "Daily cleanup at 2 AM UTC"
+  "description": "Daily cleanup at 2 AM UTC with custom parameters"
 }
 ```
 
