@@ -819,6 +819,221 @@ Functions return structured error responses when execution fails:
 }
 ```
 
+## Triggers
+
+Triggers automatically execute tasks in response to events like schedules, database changes, or HTTP requests. They provide automation capabilities for your BaseBase applications.
+
+### Creating Triggers
+
+Create triggers using POST requests to configure automatic task execution:
+
+```
+POST http://localhost:8000/v1/projects/PROJECT_ID/triggers
+Authorization: Bearer JWT_TOKEN
+Content-Type: application/json
+```
+
+### Request Body Format
+
+**Required Fields:**
+
+- `taskId` (string): The ID of the task to execute
+- `triggerType` (string): Type of trigger - `"cron"`, `"onCreate"`, `"onUpdate"`, `"onDelete"`, `"onWrite"`, or `"http"`
+- `config` (object): Configuration specific to the trigger type
+
+**Optional Fields:**
+
+- `enabled` (boolean): Whether the trigger is active (default: `true`)
+- `description` (string): Human-readable description
+
+### Trigger Types & Examples
+
+#### 1. Cron Triggers (Scheduled Tasks)
+
+Execute tasks on a schedule using cron expressions:
+
+```json
+{
+  "taskId": "daily-cleanup",
+  "triggerType": "cron",
+  "config": {
+    "schedule": "0 2 * * *",
+    "timezone": "UTC"
+  },
+  "enabled": true,
+  "description": "Daily cleanup at 2 AM UTC"
+}
+```
+
+**Common Schedule Examples:**
+
+- `"*/10 * * * * *"` - Every 10 seconds
+- `"0 */5 * * * *"` - Every 5 minutes
+- `"0 0 */2 * * *"` - Every 2 hours
+- `"0 0 9 * * 1"` - Every Monday at 9 AM
+- `"0 30 14 1 * *"` - 1st day of month at 2:30 PM
+
+#### 2. Database Triggers
+
+Execute tasks when documents are created, updated, or deleted:
+
+**onCreate Trigger:**
+
+```json
+{
+  "taskId": "welcome-new-user",
+  "triggerType": "onCreate",
+  "config": {
+    "collection": "users",
+    "document": "users/{userId}"
+  },
+  "enabled": true,
+  "description": "Send welcome email when user registers"
+}
+```
+
+**onUpdate Trigger:**
+
+```json
+{
+  "taskId": "sync-profile-changes",
+  "triggerType": "onUpdate",
+  "config": {
+    "collection": "user_profiles",
+    "document": "user_profiles/{profileId}"
+  },
+  "enabled": true,
+  "description": "Sync profile changes to external services"
+}
+```
+
+**onDelete Trigger:**
+
+```json
+{
+  "taskId": "cleanup-user-data",
+  "triggerType": "onDelete",
+  "config": {
+    "collection": "users"
+  },
+  "enabled": true,
+  "description": "Clean up related data when user is deleted"
+}
+```
+
+#### 3. HTTP Triggers (Webhooks)
+
+Create webhook endpoints that execute tasks when called:
+
+```json
+{
+  "taskId": "process-webhook",
+  "triggerType": "http",
+  "config": {
+    "method": "POST",
+    "path": "/webhook/stripe-payment"
+  },
+  "enabled": true,
+  "description": "Process Stripe payment webhooks"
+}
+```
+
+**Generated Webhook URL:**
+
+```
+POST http://localhost:8000/v1/projects/PROJECT_ID/webhooks/stripe-payment
+```
+
+### Managing Triggers
+
+**List All Triggers:**
+
+```bash
+curl http://localhost:8000/v1/projects/PROJECT_ID/triggers \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Get Specific Trigger:**
+
+```bash
+curl http://localhost:8000/v1/projects/PROJECT_ID/triggers/TRIGGER_ID \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+**Update Trigger:**
+
+```bash
+curl -X PUT http://localhost:8000/v1/projects/PROJECT_ID/triggers/TRIGGER_ID \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": false,
+    "description": "Disabled for maintenance"
+  }'
+```
+
+**Delete Trigger:**
+
+```bash
+curl -X DELETE http://localhost:8000/v1/projects/PROJECT_ID/triggers/TRIGGER_ID \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+### Response Format
+
+**Successful Creation:**
+
+```json
+{
+  "_id": "trigger_abc123",
+  "taskId": "daily-cleanup",
+  "triggerType": "cron",
+  "config": {
+    "schedule": "0 2 * * *",
+    "timezone": "UTC"
+  },
+  "enabled": true,
+  "description": "Daily cleanup at 2 AM UTC",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "createdBy": "user_123"
+}
+```
+
+### Error Responses
+
+**Missing Required Fields:**
+
+```json
+{
+  "error": "taskId is required"
+}
+```
+
+**Invalid Trigger Configuration:**
+
+```json
+{
+  "error": "Invalid cron schedule: '* * * *' - must have 6 fields"
+}
+```
+
+**Task Not Found:**
+
+```json
+{
+  "error": "Task not found"
+}
+```
+
+### Best Practices
+
+1. **Use Descriptive Names**: Add clear descriptions to help team members understand trigger purposes
+2. **Test Schedules**: Verify cron expressions work as expected before enabling
+3. **Monitor Execution**: Check task logs to ensure triggers execute successfully
+4. **Resource Management**: Avoid overly frequent schedules that could impact performance
+5. **Error Handling**: Ensure triggered tasks have proper error handling and logging
+
 ## Security Rules
 
 BaseBase automatically creates security rules for each collection using Firebase Security Rules syntax. When a new collection is created, default rules are initialized that allow all operations.
