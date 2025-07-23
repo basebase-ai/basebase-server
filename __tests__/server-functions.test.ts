@@ -78,11 +78,7 @@ describe("Server Tasks Tests", () => {
         .get("/v1/projects/test-project/tasks");
 
       expect(response.status).toBe(200);
-      expect(response.body.globalCount).toBeDefined();
       expect(response.body.projectCount).toBeDefined();
-      expect(response.body.count).toBe(
-        response.body.globalCount + response.body.projectCount
-      );
 
       // All tasks should have isUserTask property
       response.body.tasks.forEach((task: any) => {

@@ -47,6 +47,31 @@ export async function executeCloudTask(
     const AsyncFunction = Object.getPrototypeOf(
       async function () {}
     ).constructor;
+
+    // Firebase-style execution: Tasks must use module.exports pattern
+    const executionCode = `
+      "use strict";
+      
+      // Create Node.js-like module environment (Firebase Functions pattern)
+      const module = { exports: {} };
+      const exports = module.exports;
+      
+      // Execute user code (should set module.exports)
+      ${taskCode}
+      
+      // Validate that a handler was exported
+      if (typeof module.exports !== 'function') {
+        throw new Error('Task must export a handler function using module.exports\\n\\n' +
+          'Example:\\n' +
+          'module.exports = async (params, context) => {\\n' +
+          '  const { console, data, tasks } = context;\\n' +
+          '  return { success: true };\\n' +
+          '};');
+      }
+      
+      return module.exports(params, context, axios, twilio, getTwilioPhoneNumber, moment, momentTimezone, puppeteer, rssParser);
+    `;
+
     const userTask = new AsyncFunction(
       "params",
       "context",
@@ -57,10 +82,7 @@ export async function executeCloudTask(
       "momentTimezone",
       "puppeteer",
       "rssParser",
-      `
-        "use strict";
-        return (${taskCode})(params, context, axios, twilio, getTwilioPhoneNumber, moment, momentTimezone, puppeteer, rssParser);
-      `
+      executionCode
     );
 
     // Execute with timeout

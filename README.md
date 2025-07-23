@@ -588,12 +588,25 @@ curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/tasks \
 
 #### Task Code Structure
 
-User tasks are JavaScript async functions with the following signature:
+User tasks follow the Firebase Functions pattern using `module.exports`:
 
 ```javascript
-async (params, context) => {
-  // Task implementation
-  return result;
+// Helper functions and constants
+const BATCH_SIZE = 100;
+
+function validateInput(data) {
+  return data && typeof data === "object";
+}
+
+// Main handler - export your async function
+module.exports = async (params, context) => {
+  const { console, data, tasks } = context;
+
+  if (!validateInput(params)) {
+    throw new Error("Invalid input data");
+  }
+
+  return { success: true, processed: true };
 };
 ```
 
