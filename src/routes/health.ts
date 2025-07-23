@@ -81,22 +81,20 @@ export function create404Handler() {
     console.log(
       `  PUT /v1/projects/[projectId]/databases/(default)/documents/[collectionId]/_security - Update collection metadata`
     );
-    console.log(`[404] Available routes for server functions:`);
+    console.log(`[404] Available routes for cloud tasks:`);
+    console.log(`  GET /v1/projects/[projectId]/tasks - List all cloud tasks`);
     console.log(
-      `  GET /v1/projects/[projectId]/functions - List all server functions`
+      `  GET /v1/projects/[projectId]/tasks/[taskName] - Get specific task details`
+    );
+    console.log(`  POST /v1/projects/[projectId]/tasks - Create task`);
+    console.log(
+      `  PUT /v1/projects/[projectId]/tasks/[taskName] - Update task`
     );
     console.log(
-      `  GET /v1/projects/[projectId]/functions/[functionName] - Get specific function details`
-    );
-    console.log(`  POST /v1/projects/[projectId]/functions - Create function`);
-    console.log(
-      `  PUT /v1/projects/[projectId]/functions/[functionName] - Update function`
+      `  DELETE /v1/projects/[projectId]/tasks/[taskName] - Delete task`
     );
     console.log(
-      `  DELETE /v1/projects/[projectId]/functions/[functionName] - Delete function`
-    );
-    console.log(
-      `  POST /v1/projects/[projectId]/functions/[functionName]:call - Call server function`
+      `  POST /v1/projects/[projectId]/tasks/[taskName]:call - Call cloud task`
     );
 
     res.status(404).json({
@@ -117,8 +115,8 @@ export function create404Handler() {
           "GET/PUT /v1/projects/:projectId/databases/(default)/documents/:collectionId/_security",
         auth: "POST /v1/requestCode, POST /v1/verifyCode",
         projects: "GET /v1/projects, POST /v1/projects",
-        functions:
-          "GET /v1/projects/:projectId/functions, GET /v1/projects/:projectId/functions/:functionName, POST /v1/projects/:projectId/functions, PUT /v1/projects/:projectId/functions/:functionName, DELETE /v1/projects/:projectId/functions/:functionName, POST /v1/projects/:projectId/functions/:functionName:call",
+        tasks:
+          "GET /v1/projects/:projectId/tasks, GET /v1/projects/:projectId/tasks/:taskName, POST /v1/projects/:projectId/tasks, PUT /v1/projects/:projectId/tasks/:taskName, DELETE /v1/projects/:projectId/tasks/:taskName, POST /v1/projects/:projectId/tasks/:taskName:call",
       },
     });
   };

@@ -1,6 +1,7 @@
 // Re-export all types for easy importing
 export * from "./database";
 export * from "./functions";
+export * from "./tasks";
 export * from "./triggers";
 export * from "./api";
 

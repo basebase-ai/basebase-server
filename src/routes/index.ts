@@ -2,7 +2,7 @@ import { Express } from "express";
 import { checkConnection } from "../database/connection";
 import { authenticateToken } from "../../auth";
 import documentsRoutes from "./documents";
-import functionsRoutes from "./functions";
+import tasksRoutes from "./tasks";
 import triggersRoutes from "./triggers";
 import queriesRoutes from "./queries";
 import healthRoutes, { create404Handler } from "./health";
@@ -15,8 +15,8 @@ export function setupRoutes(app: Express): void {
   // Document CRUD routes (auth + connection required)
   app.use(checkConnection, authenticateToken, documentsRoutes);
 
-  // Function management routes (auth + connection required)
-  app.use(checkConnection, authenticateToken, functionsRoutes);
+  // Task management routes (auth + connection required)
+  app.use(checkConnection, authenticateToken, tasksRoutes);
 
   // Trigger management routes (auth + connection required)
   app.use(checkConnection, authenticateToken, triggersRoutes);

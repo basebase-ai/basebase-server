@@ -3,14 +3,14 @@ import moment from "moment";
 import momentTimezone from "moment-timezone";
 import puppeteer from "puppeteer";
 import RSSParser from "rss-parser";
-import { FunctionExecutionContext } from "../types/functions";
+import { TaskExecutionContext } from "../types/tasks";
 import { getTwilioClient, getTwilioPhoneNumber } from "../services/twilio";
 
-// Helper function to execute server function code safely
-export async function executeServerFunction(
-  functionCode: string,
+// Helper function to execute cloud task code safely
+export async function executeCloudTask(
+  taskCode: string,
   params: Record<string, any>,
-  context: FunctionExecutionContext,
+  context: TaskExecutionContext,
   requiredServices: string[]
 ): Promise<any> {
   try {
@@ -43,11 +43,11 @@ export async function executeServerFunction(
       }
     }
 
-    // Create the function from the code string
+    // Create the task from the code string
     const AsyncFunction = Object.getPrototypeOf(
       async function () {}
     ).constructor;
-    const userFunction = new AsyncFunction(
+    const userTask = new AsyncFunction(
       "params",
       "context",
       "axios",
@@ -59,16 +59,16 @@ export async function executeServerFunction(
       "rssParser",
       `
         "use strict";
-        return (${functionCode})(params, context);
+        return (${taskCode})(params, context);
       `
     );
 
     // Execute with timeout
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Function execution timeout")), 30000); // 30 second timeout
+      setTimeout(() => reject(new Error("Task execution timeout")), 30000); // 30 second timeout
     });
 
-    const executionPromise = userFunction(
+    const executionPromise = userTask(
       params,
       context,
       services.axios,
@@ -83,7 +83,7 @@ export async function executeServerFunction(
     const result = await Promise.race([executionPromise, timeoutPromise]);
     return result;
   } catch (error) {
-    console.error("Function execution error:", error);
-    throw new Error(`Function execution failed: ${(error as Error).message}`);
+    console.error("Task execution error:", error);
+    throw new Error(`Task execution failed: ${(error as Error).message}`);
   }
 }

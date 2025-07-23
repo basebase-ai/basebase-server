@@ -12,7 +12,7 @@ import {
 } from "../types";
 import {
   getProjectTriggersCollection,
-  getProjectFunctionsCollection,
+  getProjectTasksCollection,
 } from "../database/collections";
 import { validateTriggerConfig } from "../utils/trigger-validation";
 
@@ -94,7 +94,7 @@ router.post(
       }
 
       // Check if function exists
-      const functionsCollection = getProjectFunctionsCollection(projectId);
+      const functionsCollection = getProjectTasksCollection(projectId);
       const functionExists = await functionsCollection.findOne({
         _id: triggerData.functionId,
       });
@@ -159,7 +159,7 @@ router.put(
 
       // Check if function exists if being updated
       if (updates.functionId) {
-        const functionsCollection = getProjectFunctionsCollection(projectId);
+        const functionsCollection = getProjectTasksCollection(projectId);
         const functionExists = await functionsCollection.findOne({
           _id: updates.functionId,
         });

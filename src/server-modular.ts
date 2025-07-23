@@ -11,8 +11,8 @@ import {
 } from "./database/connection";
 import { setupRoutes } from "./routes";
 import { authenticateToken, setupAuthRoutes } from "../auth";
-import { initializeDefaultServerFunctions } from "./functions/initialization";
-import { SimpleScheduler } from "./functions/scheduler";
+import { initializeDefaultCloudTasks } from "./tasks/initialization";
+import { SimpleScheduler } from "./tasks/scheduler";
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -28,14 +28,14 @@ async function startServer(): Promise<void> {
     await connectToMongoDB();
     console.log("✅ Database connected");
 
-    // 2. Initialize default server functions
-    await initializeDefaultServerFunctions();
-    console.log("✅ Default functions initialized");
+    // 2. Initialize default cloud tasks
+    await initializeDefaultCloudTasks();
+    console.log("✅ Default tasks initialized");
 
     // 3. Start scheduler
     const scheduler = SimpleScheduler.getInstance();
     scheduler.start();
-    console.log("✅ Function scheduler started");
+    console.log("✅ Task scheduler started");
 
     // 4. Setup authentication routes
     setupAuthRoutes(app, getMongoClient(), checkConnection);
@@ -101,7 +101,7 @@ process.on("SIGINT", async () => {
 // Test initialization function
 async function initializeForTesting(): Promise<void> {
   await connectToMongoDB();
-  await initializeDefaultServerFunctions();
+  await initializeDefaultCloudTasks();
   setupAuthRoutes(app, getMongoClient(), checkConnection);
   setupRoutes(app);
 
@@ -125,12 +125,7 @@ async function initializeForTesting(): Promise<void> {
 }
 
 // Export for testing
-export {
-  app,
-  startServer,
-  initializeForTesting,
-  initializeDefaultServerFunctions,
-};
+export { app, startServer, initializeForTesting, initializeDefaultCloudTasks };
 
 // Only start server if not in test environment
 if (process.env.NODE_ENV !== "test") {

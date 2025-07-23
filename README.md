@@ -344,16 +344,16 @@ The `:runQuery` endpoint returns an array of documents in Firebase format:
 ]
 ```
 
-## Basebase Functions
+## Cloud Tasks
 
-BaseBase supports server-side functions that can be invoked via HTTP endpoints. Functions are executed in a secure sandbox environment and can access external services like HTTP APIs and SMS providers.
+BaseBase supports server-side cloud tasks that can be invoked via HTTP endpoints. Tasks are executed in a secure sandbox environment and can access external services like HTTP APIs and SMS providers.
 
-### Invoking Functions
+### Invoking Tasks
 
-Functions are called using POST requests to the following endpoint pattern:
+Tasks are called using POST requests to the following endpoint pattern:
 
 ```
-POST http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME:call
+POST http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME:call
 Authorization: Bearer JWT_TOKEN
 Content-Type: application/json
 ```
@@ -375,14 +375,14 @@ Content-Type: application/json
 {
   "success": true,
   "result": {
-    // Function-specific response data
+    // Task-specific response data
   },
-  "functionName": "FUNCTION_NAME",
+  "taskName": "TASK_NAME",
   "executedAt": "2024-01-01T00:00:00.000Z"
 }
 ```
 
-### Available Functions
+### Available Tasks
 
 #### getPage()
 
@@ -395,7 +395,7 @@ Retrieves the contents of a webpage using HTTP GET.
 **Example:**
 
 ```bash
-curl -X POST http://localhost:8000/v1/projects/my-project/functions/getPage:call \
+curl -X POST http://localhost:8000/v1/projects/my-project/tasks/getPage:call \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -448,7 +448,7 @@ Configure these environment variables in your `.env` file:
 **Example:**
 
 ```bash
-curl -X POST http://localhost:8000/v1/projects/my-project/functions/sendSms:call \
+curl -X POST http://localhost:8000/v1/projects/my-project/tasks/sendSms:call \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -485,7 +485,7 @@ npm run test-twilio
 
 ### Available NPM Packages
 
-Server functions have access to these pre-installed NPM packages:
+Cloud tasks have access to these pre-installed NPM packages:
 
 | Package           | Purpose              | Usage Example                                |
 | ----------------- | -------------------- | -------------------------------------------- |
@@ -534,46 +534,46 @@ const latest = lodash.take(lodash.orderBy(feed.items, 'pubDate', 'desc'), 5);
 npm run test-packages
 ```
 
-### User-Defined Functions
+### User-Defined Tasks
 
-In addition to built-in functions, you can create custom functions that run on the BaseBase server. User functions have access to the database, can call other functions, and support scheduled execution.
+In addition to built-in tasks, you can create custom tasks that run on the BaseBase server. User tasks have access to the database, can call other tasks, and support scheduled execution.
 
-#### Creating User Functions
+#### Creating User Tasks
 
 ```bash
-curl -X POST http://localhost:8000/v1/functions \
+curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/tasks \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "id": "processUserData",
     "description": "Processes user activity data and creates reports",
-    "implementationCode": "async (params, context) => { const { console, data, functions } = context; const { userId } = params; if (!userId) throw new Error(\"userId required\"); console.log(`Processing data for user: ${userId}`); const activities = await data.collection(\"user_activities\").queryDocs({ where: [{ field: \"userId\", operator: \"==\", value: userId }], limit: 100 }); const summary = { userId, totalActivities: activities.length, lastActivity: activities[0] || null, processedAt: new Date().toISOString() }; await data.collection(\"user_reports\").addDoc(summary); return summary; }",
+    "implementationCode": "async (params, context) => { const { console, data, tasks } = context; const { userId } = params; if (!userId) throw new Error(\"userId required\"); console.log(`Processing data for user: ${userId}`); const activities = await data.collection(\"user_activities\").queryDocs({ where: [{ field: \"userId\", operator: \"==\", value: userId }], limit: 100 }); const summary = { userId, totalActivities: activities.length, lastActivity: activities[0] || null, processedAt: new Date().toISOString() }; await data.collection(\"user_reports\").addDoc(summary); return summary; }",
     "requiredServices": [],
     "enabled": true
   }'
 ```
 
-#### Function Code Structure
+#### Task Code Structure
 
-User functions are JavaScript async functions with the following signature:
+User tasks are JavaScript async functions with the following signature:
 
 ```javascript
 async (params, context) => {
-  // Function implementation
+  // Task implementation
   return result;
 };
 ```
 
 **Parameters:**
 
-- `params`: Object containing input parameters passed to the function
+- `params`: Object containing input parameters passed to the task
 - `context`: Execution context with APIs and utilities
 
 **Context APIs:**
 
 - `context.console`: Logging (`console.log`, `console.error`, `console.warn`)
 - `context.data`: Database API (Firebase-style operations)
-- `context.functions`: Function API (call other functions)
+- `context.tasks`: Task API (call other tasks)
 - `context.user`: User information (`userId`, `projectName`)
 - `context.project`: Project information (`name`)
 
@@ -654,41 +654,41 @@ curl -X POST http://localhost:8000/v1/functions \
 - `"0 2 * * *"` - Daily at 2 AM
 - `"0 9 * * 1"` - Every Monday at 9 AM
 
-#### Function Management
+#### Task Management
 
-**List All Functions (Built-in + User):**
+**List All Tasks (Built-in + User):**
 
 ```bash
-curl http://localhost:8000/v1/projects/PROJECT_ID/functions \
+curl http://localhost:8000/v1/projects/PROJECT_ID/tasks \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-**Get Function Details:**
+**Get Task Details:**
 
 ```bash
-curl http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME \
+curl http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-**Create Function:**
+**Create Task:**
 
 ```bash
-curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/functions \
+curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/tasks \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "myFunction",
-    "description": "My custom function",
+    "id": "myTask",
+    "description": "My custom task",
     "implementationCode": "async (params, context) => { return { result: \"Hello World\" }; }",
     "schedule": "0 */2 * * *",
     "enabled": true
   }'
 ```
 
-**Update Function:**
+**Update Task:**
 
 ```bash
-curl -X PUT http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME \
+curl -X PUT http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -699,20 +699,20 @@ curl -X PUT http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME
   }'
 ```
 
-**Delete Function:**
+**Delete Task:**
 
 ```bash
-curl -X DELETE http://localhost:8000/v1/projects/PROJECT_ID/functions/FUNCTION_NAME \
+curl -X DELETE http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-#### Function Examples
+#### Task Examples
 
 **RSS Feed Processor:**
 
 ```javascript
 async (params, context) => {
-  const { console, data, functions } = context;
+  const { console, data, tasks } = context;
 
   // Get news sources that need updating
   const sources = await data.collection("news_sources").queryDocs({

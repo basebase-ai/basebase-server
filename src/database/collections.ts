@@ -1,6 +1,6 @@
 import { Collection, Db } from "mongodb";
 import { getMongoClient } from "./connection";
-import { ServerFunction } from "../types/functions";
+import { CloudTask } from "../types/tasks";
 import { Trigger, ScheduledJob } from "../types/triggers";
 
 // Helper function to get database and collection
@@ -14,22 +14,18 @@ export function getDbAndCollection(
   return { db, collection };
 }
 
-// Helper function to get server functions collection (global basebase functions)
-export function getServerFunctionsCollection(): Collection<ServerFunction> {
+// Helper function to get cloud tasks collection (global basebase tasks)
+export function getCloudTasksCollection(): Collection<CloudTask> {
   const mongoClient = getMongoClient();
-  return mongoClient
-    .db("basebase")
-    .collection<ServerFunction>("server_functions");
+  return mongoClient.db("basebase").collection<CloudTask>("tasks");
 }
 
-// Helper function to get project-specific server functions collection
-export function getProjectFunctionsCollection(
+// Helper function to get project-specific cloud tasks collection
+export function getProjectTasksCollection(
   projectName: string
-): Collection<ServerFunction> {
+): Collection<CloudTask> {
   const mongoClient = getMongoClient();
-  return mongoClient
-    .db(projectName)
-    .collection<ServerFunction>("server_functions");
+  return mongoClient.db(projectName).collection<CloudTask>("tasks");
 }
 
 // Helper function to get scheduled jobs collection
