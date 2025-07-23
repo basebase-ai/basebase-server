@@ -483,6 +483,57 @@ curl -X POST http://localhost:8000/v1/projects/my-project/functions/sendSms:call
 npm run test-twilio
 ```
 
+### Available NPM Packages
+
+Server functions have access to these pre-installed NPM packages:
+
+| Package           | Purpose              | Usage Example                                |
+| ----------------- | -------------------- | -------------------------------------------- |
+| `axios`           | HTTP requests        | `await axios.get('https://api.example.com')` |
+| `twilio`          | SMS messaging        | `await twilio.messages.create({...})`        |
+| `moment`          | Date manipulation    | `moment().format('YYYY-MM-DD')`              |
+| `moment-timezone` | Timezone-aware dates | `momentTimezone.tz('America/New_York')`      |
+| `lodash`          | Utility functions    | `lodash.uniq([1,1,2,3])`                     |
+| `puppeteer`       | Browser automation   | `await puppeteer.launch()`                   |
+| `rss-parser`      | RSS/Atom parsing     | `await rssParser.parseString(xml)`           |
+
+**Function Signature:**
+
+```javascript
+async (
+  params,
+  context,
+  axios,
+  twilio,
+  getTwilioPhoneNumber,
+  moment,
+  momentTimezone,
+  lodash,
+  puppeteer,
+  rssParser
+) => {
+  // Your function code here
+};
+```
+
+**Example RSS Parser Function:**
+
+```javascript
+// Declare required services in your function
+"requiredServices": ["axios", "moment", "lodash", "rss-parser"]
+
+// Use in function code
+const pageResult = await context.functions.call('getPage', { url: rssUrl });
+const feed = await rssParser.parseString(pageResult.data);
+const latest = lodash.take(lodash.orderBy(feed.items, 'pubDate', 'desc'), 5);
+```
+
+**Test All Packages:**
+
+```bash
+npm run test-packages
+```
+
 ### User-Defined Functions
 
 In addition to built-in functions, you can create custom functions that run on the BaseBase server. User functions have access to the database, can call other functions, and support scheduled execution.

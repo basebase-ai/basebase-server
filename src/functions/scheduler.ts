@@ -1,22 +1,14 @@
 import { getMongoClient } from "../database/connection";
-import { getProjectFunctionsCollection } from "../database/collections";
+import {
+  getProjectFunctionsCollection,
+  getProjectTriggersCollection,
+} from "../database/collections";
 import { ServerFunction, FunctionExecutionContext } from "../types/functions";
+import { Trigger, CronTriggerConfig } from "../types/triggers";
 import { ProjectDataAPI } from "../api/data-api";
 import { ProjectFunctionAPI } from "../api/functions-api";
 import { FunctionConsoleAPI } from "../api/console-api";
 import { executeServerFunction } from "./execution";
-
-interface ScheduledJob {
-  _id: string;
-  projectId: string;
-  functionId: string;
-  cronExpression: string;
-  nextRun: Date;
-  lastRun?: Date;
-  enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 // Simple cron expression parser for basic scheduling
 export class SimpleScheduler {
@@ -55,12 +47,12 @@ export class SimpleScheduler {
     try {
       const now = new Date();
       console.log(
-        `[SCHEDULER] Checking scheduled functions at ${now.toISOString()}`
+        `[SCHEDULER] Checking scheduled triggers at ${now.toISOString()}`
       );
 
       const mongoClient = getMongoClient();
 
-      // Get all projects that have scheduled functions
+      // Get all projects that have cron triggers
       const adminDb = mongoClient.db().admin();
       const databases = await adminDb.listDatabases();
 
@@ -75,29 +67,30 @@ export class SimpleScheduler {
         }
 
         try {
-          const projectFunctionsCollection = getProjectFunctionsCollection(
+          const projectTriggersCollection = getProjectTriggersCollection(
             dbInfo.name
           );
-          const scheduledFunctions = await projectFunctionsCollection
+          const cronTriggers = await projectTriggersCollection
             .find({
-              schedule: { $exists: true, $type: "string" },
+              triggerType: "cron",
               enabled: { $ne: false },
             })
             .toArray();
 
-          for (const func of scheduledFunctions) {
-            if (this.shouldRunFunction(func.schedule!, now)) {
+          for (const trigger of cronTriggers) {
+            const cronConfig = trigger.config as CronTriggerConfig;
+            if (this.shouldRunFunction(cronConfig.schedule, now)) {
               console.log(
-                `[SCHEDULER] Executing scheduled function: ${func._id} in project ${dbInfo.name}`
+                `[SCHEDULER] Executing cron trigger: ${trigger._id} for function ${trigger.functionId} in project ${dbInfo.name}`
               );
 
               // Execute function in background
               setImmediate(async () => {
                 try {
-                  await this.executeScheduledFunction(dbInfo.name, func);
+                  await this.executeTriggeredFunction(dbInfo.name, trigger);
                 } catch (error) {
                   console.error(
-                    `[SCHEDULER] Error executing scheduled function ${func._id}:`,
+                    `[SCHEDULER] Error executing triggered function ${trigger.functionId}:`,
                     error
                   );
                 }
@@ -106,7 +99,7 @@ export class SimpleScheduler {
           }
         } catch (error) {
           console.error(
-            `[SCHEDULER] Error checking functions in project ${dbInfo.name}:`,
+            `[SCHEDULER] Error checking triggers in project ${dbInfo.name}:`,
             error
           );
         }
@@ -144,18 +137,32 @@ export class SimpleScheduler {
     return false;
   }
 
-  private async executeScheduledFunction(
+  private async executeTriggeredFunction(
     projectName: string,
-    func: ServerFunction
+    trigger: Trigger
   ): Promise<void> {
     try {
-      // Create execution context for scheduled function
+      // Get the function to execute
+      const projectFunctionsCollection =
+        getProjectFunctionsCollection(projectName);
+      const func = await projectFunctionsCollection.findOne({
+        _id: trigger.functionId,
+      });
+
+      if (!func) {
+        console.error(
+          `[SCHEDULER] Function ${trigger.functionId} not found for trigger ${trigger._id}`
+        );
+        return;
+      }
+
+      // Create execution context for triggered function
       const consoleAPI = new FunctionConsoleAPI();
       const dataAPI = new ProjectDataAPI(projectName);
 
       const partialContext: Partial<FunctionExecutionContext> = {
         user: {
-          userId: func.createdBy || "system",
+          userId: trigger.createdBy || "system",
           projectName: projectName,
         },
         project: {
@@ -183,12 +190,12 @@ export class SimpleScheduler {
       );
 
       console.log(
-        `[SCHEDULER] Successfully executed scheduled function ${func._id}:`,
+        `[SCHEDULER] Successfully executed triggered function ${func._id} via trigger ${trigger._id}:`,
         result
       );
     } catch (error) {
       console.error(
-        `[SCHEDULER] Failed to execute scheduled function ${func._id}:`,
+        `[SCHEDULER] Failed to execute triggered function ${trigger.functionId} via trigger ${trigger._id}:`,
         error
       );
     }

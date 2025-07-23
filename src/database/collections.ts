@@ -1,6 +1,7 @@
 import { Collection, Db } from "mongodb";
 import { getMongoClient } from "./connection";
-import { ServerFunction, ScheduledJob } from "../types/functions";
+import { ServerFunction } from "../types/functions";
+import { Trigger, ScheduledJob } from "../types/triggers";
 
 // Helper function to get database and collection
 export function getDbAndCollection(
@@ -35,4 +36,18 @@ export function getProjectFunctionsCollection(
 export function getScheduledJobsCollection(): Collection<ScheduledJob> {
   const mongoClient = getMongoClient();
   return mongoClient.db("basebase").collection<ScheduledJob>("scheduled_jobs");
+}
+
+// Helper function to get global triggers collection
+export function getTriggersCollection(): Collection<Trigger> {
+  const mongoClient = getMongoClient();
+  return mongoClient.db("basebase").collection<Trigger>("triggers");
+}
+
+// Helper function to get project-specific triggers collection
+export function getProjectTriggersCollection(
+  projectName: string
+): Collection<Trigger> {
+  const mongoClient = getMongoClient();
+  return mongoClient.db(projectName).collection<Trigger>("triggers");
 }

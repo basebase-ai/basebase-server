@@ -8,7 +8,6 @@ export interface ServerFunction {
   createdAt: Date;
   updatedAt: Date;
   // New fields for user functions
-  schedule?: string; // Cron expression (optional)
   enabled?: boolean; // Whether function is active (default: true)
   createdBy?: string; // User ID (undefined for global basebase functions)
   isUserFunction?: boolean; // True for user-defined functions
@@ -81,16 +80,4 @@ export interface ConsoleAPI {
   log(...args: any[]): void;
   error(...args: any[]): void;
   warn(...args: any[]): void;
-}
-
-export interface ScheduledJob {
-  _id: string;
-  projectId: string;
-  functionId: string;
-  cronExpression: string;
-  nextRun: Date;
-  lastRun?: Date;
-  enabled: boolean;
-  createdAt: Date;
-  updatedAt: Date;
 }

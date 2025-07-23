@@ -1,4 +1,8 @@
 import axios from "axios";
+import moment from "moment";
+import momentTimezone from "moment-timezone";
+import puppeteer from "puppeteer";
+import RSSParser from "rss-parser";
 import { FunctionExecutionContext } from "../types/functions";
 import { getTwilioClient, getTwilioPhoneNumber } from "../services/twilio";
 
@@ -22,6 +26,18 @@ export async function executeServerFunction(
         case "twilio":
           services.twilio = getTwilioClient();
           break;
+        case "moment":
+          services.moment = moment;
+          break;
+        case "moment-timezone":
+          services.momentTimezone = momentTimezone;
+          break;
+        case "puppeteer":
+          services.puppeteer = puppeteer;
+          break;
+        case "rss-parser":
+          services.rssParser = new RSSParser();
+          break;
         default:
           console.warn(`Unknown service requested: ${service}`);
       }
@@ -37,6 +53,10 @@ export async function executeServerFunction(
       "axios",
       "twilio",
       "getTwilioPhoneNumber",
+      "moment",
+      "momentTimezone",
+      "puppeteer",
+      "rssParser",
       `
         "use strict";
         return (${functionCode})(params, context);
@@ -53,7 +73,11 @@ export async function executeServerFunction(
       context,
       services.axios,
       services.twilio,
-      getTwilioPhoneNumber
+      getTwilioPhoneNumber,
+      services.moment,
+      services.momentTimezone,
+      services.puppeteer,
+      services.rssParser
     );
 
     const result = await Promise.race([executionPromise, timeoutPromise]);

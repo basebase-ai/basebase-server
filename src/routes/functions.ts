@@ -77,7 +77,6 @@ router.get(
           createdAt: func.createdAt,
           updatedAt: func.updatedAt,
           isUserFunction: false,
-          schedule: func.schedule,
           enabled: func.enabled !== false,
         })),
         ...projectFunctions.map((func) => ({
@@ -87,7 +86,6 @@ router.get(
           createdAt: func.createdAt,
           updatedAt: func.updatedAt,
           isUserFunction: true,
-          schedule: func.schedule,
           enabled: func.enabled !== false,
           createdBy: func.createdBy,
         })),
@@ -192,7 +190,6 @@ router.get(
         createdAt: serverFunction.createdAt,
         updatedAt: serverFunction.updatedAt,
         isUserFunction,
-        schedule: serverFunction.schedule,
         enabled: serverFunction.enabled !== false,
         createdBy: serverFunction.createdBy,
       });
@@ -212,14 +209,8 @@ router.post(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId } = req.params;
-      const {
-        id,
-        description,
-        implementationCode,
-        requiredServices,
-        schedule,
-        enabled,
-      } = req.body;
+      const { id, description, implementationCode, requiredServices, enabled } =
+        req.body;
 
       if (!id || !description || !implementationCode) {
         return res.status(400).json({
@@ -293,7 +284,6 @@ router.post(
         description,
         implementationCode,
         requiredServices: requiredServices || [],
-        schedule,
         enabled: enabled !== false,
         createdBy: req.user!.userId,
         isUserFunction: true,
@@ -311,7 +301,6 @@ router.post(
         id: newFunction._id,
         description: newFunction.description,
         requiredServices: newFunction.requiredServices,
-        schedule: newFunction.schedule,
         enabled: newFunction.enabled,
         isUserFunction: true,
         createdBy: newFunction.createdBy,
@@ -335,13 +324,8 @@ router.put(
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, functionName } = req.params;
-      const {
-        description,
-        implementationCode,
-        requiredServices,
-        schedule,
-        enabled,
-      } = req.body;
+      const { description, implementationCode, requiredServices, enabled } =
+        req.body;
 
       console.log(
         `[FUNCTION] PUT /v1/projects/${projectId}/functions/${functionName}`
@@ -402,7 +386,6 @@ router.put(
         updateData.implementationCode = implementationCode;
       if (requiredServices !== undefined)
         updateData.requiredServices = requiredServices;
-      if (schedule !== undefined) updateData.schedule = schedule;
       if (enabled !== undefined) updateData.enabled = enabled;
 
       await projectFunctionsCollection.updateOne(
@@ -421,7 +404,6 @@ router.put(
         description: updatedFunction!.description,
         implementationCode: updatedFunction!.implementationCode,
         requiredServices: updatedFunction!.requiredServices,
-        schedule: updatedFunction!.schedule,
         enabled: updatedFunction!.enabled,
         isUserFunction: true,
         createdBy: updatedFunction!.createdBy,

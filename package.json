@@ -10,7 +10,8 @@
     "test": "npm run build && jest --runInBand --detectOpenHandles --forceExit",
     "test:auth": "npm run build && jest __tests__/auth-flow.test.ts --runInBand --detectOpenHandles --forceExit",
     "test:api": "npm run build && jest __tests__/api.test.ts --runInBand --detectOpenHandles --forceExit",
-    "test-twilio": "node scripts/test-twilio.js"
+    "test-twilio": "node scripts/test-twilio.js",
+    "test-packages": "node scripts/test-packages.js"
   },
   "dependencies": {
     "axios": "^1.10.0",
@@ -19,7 +20,11 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "jsonwebtoken": "^9.0.2",
+    "moment": "^2.30.1",
+    "moment-timezone": "^0.6.0",
     "mongodb": "^6.10.0",
+    "puppeteer": "^24.14.0",
+    "rss-parser": "^3.13.0",
     "twilio": "^5.3.4"
   },
   "devDependencies": {
@@ -30,6 +35,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/nock": "^10.0.3",
     "@types/node": "^22.10.1",
+    "@types/puppeteer": "^5.4.7",
     "@types/supertest": "^6.0.2",
     "jest": "^29.7.0",
     "mongodb-memory-server": "^10.1.2",
