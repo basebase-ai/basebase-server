@@ -25,19 +25,6 @@ export async function executeCloudTask(
           break;
         case "twilio":
           services.twilio = getTwilioClient();
-          console.log(
-            `[EXECUTION] Twilio client for task execution:`,
-            services.twilio ? "Available" : "NULL"
-          );
-          console.log(
-            `[EXECUTION] Environment check - TWILIO_ACCOUNT_SID:`,
-            process.env.TWILIO_ACCOUNT_SID ? "Set" : "Missing"
-          );
-          console.log(
-            `[EXECUTION] services.twilio type:`,
-            typeof services.twilio
-          );
-          console.log(`[EXECUTION] services.twilio value:`, services.twilio);
           break;
         case "moment":
           services.moment = moment;

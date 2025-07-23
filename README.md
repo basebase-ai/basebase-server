@@ -825,10 +825,20 @@ Triggers automatically execute tasks in response to events like schedules, datab
 
 ### Creating Triggers
 
-Create triggers using POST requests to configure automatic task execution:
+Create triggers using either auto-generated or user-specified IDs:
+
+#### **Auto-Generated ID (Recommended)**
 
 ```
 POST http://localhost:8000/v1/projects/PROJECT_ID/triggers
+Authorization: Bearer JWT_TOKEN
+Content-Type: application/json
+```
+
+#### **User-Specified ID**
+
+```
+PUT http://localhost:8000/v1/projects/PROJECT_ID/triggers/YOUR_TRIGGER_ID
 Authorization: Bearer JWT_TOKEN
 Content-Type: application/json
 ```
@@ -1003,15 +1013,32 @@ curl http://localhost:8000/v1/projects/PROJECT_ID/triggers/TRIGGER_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-**Update Trigger:**
+**Update Trigger (Partial):**
+
+```bash
+curl -X PATCH http://localhost:8000/v1/projects/PROJECT_ID/triggers/TRIGGER_ID \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": false,
+    "description": "Disabled for maintenance"
+  }'
+```
+
+**Replace Trigger (Full):**
 
 ```bash
 curl -X PUT http://localhost:8000/v1/projects/PROJECT_ID/triggers/TRIGGER_ID \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "enabled": false,
-    "description": "Disabled for maintenance"
+    "taskId": "new-task",
+    "triggerType": "cron",
+    "config": {
+      "schedule": "0 3 * * *",
+      "timezone": "UTC"
+    },
+    "enabled": true
   }'
 ```
 
