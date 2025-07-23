@@ -2,10 +2,7 @@ import { Router, Response } from "express";
 import { AuthenticatedRequest } from "../types";
 import { CloudTask, TaskExecutionContext } from "../types/tasks";
 import { TaskCallRequest } from "../types/api";
-import {
-  getCloudTasksCollection,
-  getProjectTasksCollection,
-} from "../database/collections";
+import { getProjectTasksCollection } from "../database/collections";
 import { resolveProjectDatabaseName } from "../database/validation";
 import { isValidName } from "../database/validation";
 import { ProjectDataAPI } from "../api/data-api";
@@ -39,8 +36,8 @@ router.get(
         });
       }
 
-      // Check if user has access to the project
-      if (req.user!.projectName !== targetDbName) {
+      // Check if user has access to the project (allow "public" project for everyone)
+      if (req.user!.projectName !== targetDbName && targetDbName !== "public") {
         console.error(
           `[TASK] Access denied: User project ${
             req.user!.projectName
@@ -50,53 +47,35 @@ router.get(
           error: "Access denied",
           suggestion: `You can only access tasks in your own project '${
             req.user!.projectName
-          }'.`,
+          }' or the shared 'public' project.`,
         });
       }
 
-      // Get global basebase tasks
-      const globalTasksCollection = getCloudTasksCollection();
-      const globalTasks = await globalTasksCollection
-        .find({}, { projection: { implementationCode: 0 } })
-        .toArray();
-
-      // Get project-specific tasks
+      // Get project-specific tasks (could be user's project or public project)
       const projectTasksCollection = getProjectTasksCollection(targetDbName);
       const projectTasks = await projectTasksCollection
         .find({}, { projection: { implementationCode: 0 } })
         .toArray();
 
-      const allTasks = [
-        ...globalTasks.map((task) => ({
-          id: task._id,
-          description: task.description,
-          requiredServices: task.requiredServices,
-          createdAt: task.createdAt,
-          updatedAt: task.updatedAt,
-          isUserTask: false,
-          enabled: task.enabled !== false,
-        })),
-        ...projectTasks.map((task) => ({
-          id: task._id,
-          description: task.description,
-          requiredServices: task.requiredServices,
-          createdAt: task.createdAt,
-          updatedAt: task.updatedAt,
-          isUserTask: true,
-          enabled: task.enabled !== false,
-          createdBy: task.createdBy,
-        })),
-      ];
+      const allTasks = projectTasks.map((task) => ({
+        id: task._id,
+        description: task.description,
+        requiredServices: task.requiredServices,
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+        isUserTask: targetDbName !== "public", // Public tasks are not user tasks
+        enabled: task.enabled !== false,
+        createdBy: task.createdBy,
+      }));
 
       console.log(
-        `[TASK] Found ${globalTasks.length} global + ${projectTasks.length} project tasks`
+        `[TASK] Found ${projectTasks.length} tasks in project ${targetDbName}`
       );
 
       res.json({
         tasks: allTasks,
         count: allTasks.length,
-        globalCount: globalTasks.length,
-        projectCount: projectTasks.length,
+        projectName: targetDbName,
       });
     } catch (error) {
       console.error(`[TASK] Error listing tasks:`, error);
@@ -132,8 +111,8 @@ router.get(
         });
       }
 
-      // Check if user has access to the project
-      if (req.user!.projectName !== targetDbName) {
+      // Check if user has access to the project (allow "public" project for everyone)
+      if (req.user!.projectName !== targetDbName && targetDbName !== "public") {
         console.error(
           `[TASK] Access denied: User project ${
             req.user!.projectName
@@ -143,26 +122,17 @@ router.get(
           error: "Access denied",
           suggestion: `You can only access tasks in your own project '${
             req.user!.projectName
-          }'.`,
+          }' or the shared 'public' project.`,
         });
       }
 
-      // First try project tasks
+      // Look for task in the specific project requested
       const projectTasksCollection = getProjectTasksCollection(targetDbName);
-      let cloudTask = await projectTasksCollection.findOne({
+      const cloudTask = await projectTasksCollection.findOne({
         _id: taskName,
       });
 
-      let isUserTask = true;
-
-      // If not found, try global tasks
-      if (!cloudTask) {
-        const globalTasksCollection = getCloudTasksCollection();
-        cloudTask = await globalTasksCollection.findOne({
-          _id: taskName,
-        });
-        isUserTask = false;
-      }
+      const isUserTask = targetDbName !== "public"; // Public tasks are not user tasks
 
       if (!cloudTask) {
         console.log(`[TASK] Task not found: ${taskName}`);
@@ -239,8 +209,8 @@ router.post(
         });
       }
 
-      // Check if user has access to the project
-      if (req.user!.projectName !== targetDbName) {
+      // Check if user has access to the project (allow "public" project for everyone)
+      if (req.user!.projectName !== targetDbName && targetDbName !== "public") {
         console.error(
           `[TASK] Access denied: User project ${
             req.user!.projectName
@@ -250,7 +220,7 @@ router.post(
           error: "Access denied",
           suggestion: `You can only create tasks in your own project '${
             req.user!.projectName
-          }'.`,
+          }' or the shared 'public' project.`,
         });
       }
 
@@ -305,7 +275,7 @@ router.post(
   }
 );
 
-// UPDATE USER TASK - PUT
+// UPDATE/CREATE USER TASK - PUT (upsert: create if doesn't exist, update if it does)
 router.put(
   "/v1/projects/:projectId/tasks/:taskName",
   async (req: AuthenticatedRequest, res: Response) => {
@@ -319,6 +289,15 @@ router.put(
         `[TASK] User: ${req.user!.userId}, Project: ${req.user!.projectName}`
       );
 
+      // Validate task name format
+      if (!isValidName(taskName)) {
+        return res.status(400).json({
+          error: "Invalid task name",
+          suggestion:
+            "Task name must be URL-safe, up to 255 characters, and contain only letters, numbers, hyphens, and underscores.",
+        });
+      }
+
       // Resolve the requested project name to database name
       let targetDbName: string;
       try {
@@ -331,8 +310,8 @@ router.put(
         });
       }
 
-      // Check if user has access to the project
-      if (req.user!.projectName !== targetDbName) {
+      // Check if user has access to the project (allow "public" project for everyone)
+      if (req.user!.projectName !== targetDbName && targetDbName !== "public") {
         console.error(
           `[TASK] Access denied: User project ${
             req.user!.projectName
@@ -342,56 +321,94 @@ router.put(
           error: "Access denied",
           suggestion: `You can only update tasks in your own project '${
             req.user!.projectName
-          }'.`,
+          }' or the shared 'public' project.`,
         });
       }
 
       const projectTasksCollection = getProjectTasksCollection(targetDbName);
 
-      // Check if task exists and belongs to user
+      // Check if task exists
       const existingTask = await projectTasksCollection.findOne({
         _id: taskName,
       });
-      if (!existingTask) {
-        return res.status(404).json({
-          error: "Task not found",
-          suggestion: `Task '${taskName}' does not exist in your project.`,
+
+      const now = new Date();
+
+      if (existingTask) {
+        // Update existing task
+        const updateData: Partial<CloudTask> = {
+          updatedAt: now,
+        };
+
+        if (description !== undefined) updateData.description = description;
+        if (implementationCode !== undefined)
+          updateData.implementationCode = implementationCode;
+        if (requiredServices !== undefined)
+          updateData.requiredServices = requiredServices;
+        if (enabled !== undefined) updateData.enabled = enabled;
+
+        await projectTasksCollection.updateOne(
+          { _id: taskName },
+          { $set: updateData }
+        );
+
+        const updatedTask = await projectTasksCollection.findOne({
+          _id: taskName,
+        });
+
+        console.log(`[TASK] Updated existing task ${taskName}`);
+
+        res.json({
+          id: updatedTask!._id,
+          description: updatedTask!.description,
+          implementationCode: updatedTask!.implementationCode,
+          requiredServices: updatedTask!.requiredServices,
+          enabled: updatedTask!.enabled,
+          isUserTask: true,
+          createdBy: updatedTask!.createdBy,
+          createdAt: updatedTask!.createdAt,
+          updatedAt: updatedTask!.updatedAt,
+        });
+      } else {
+        // Create new task - require all fields for new tasks
+        if (!description || !implementationCode) {
+          return res.status(400).json({
+            error: "Missing required fields for new task",
+            suggestion:
+              "When creating a new task with PUT, 'description' and 'implementationCode' fields are required.",
+          });
+        }
+
+        const newTask: CloudTask = {
+          _id: taskName,
+          description,
+          implementationCode,
+          requiredServices: requiredServices || [],
+          enabled: enabled !== false,
+          createdBy: req.user!.userId,
+          isUserTask: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        await projectTasksCollection.insertOne(newTask);
+
+        console.log(
+          `[TASK] Created new task ${taskName} in project ${targetDbName}`
+        );
+
+        res.status(201).json({
+          id: newTask._id,
+          description: newTask.description,
+          implementationCode: newTask.implementationCode,
+          requiredServices: newTask.requiredServices,
+          enabled: newTask.enabled,
+          isUserTask: true,
+          createdBy: newTask.createdBy,
+          createdAt: newTask.createdAt,
+          updatedAt: newTask.updatedAt,
         });
       }
-
-      const updateData: Partial<CloudTask> = {
-        updatedAt: new Date(),
-      };
-
-      if (description !== undefined) updateData.description = description;
-      if (implementationCode !== undefined)
-        updateData.implementationCode = implementationCode;
-      if (requiredServices !== undefined)
-        updateData.requiredServices = requiredServices;
-      if (enabled !== undefined) updateData.enabled = enabled;
-
-      await projectTasksCollection.updateOne(
-        { _id: taskName },
-        { $set: updateData }
-      );
-
-      const updatedTask = await projectTasksCollection.findOne({
-        _id: taskName,
-      });
-
-      console.log(`[TASK] Updated user task ${taskName}`);
-
-      res.json({
-        id: updatedTask!._id,
-        description: updatedTask!.description,
-        implementationCode: updatedTask!.implementationCode,
-        requiredServices: updatedTask!.requiredServices,
-        enabled: updatedTask!.enabled,
-        isUserTask: true,
-        createdBy: updatedTask!.createdBy,
-        createdAt: updatedTask!.createdAt,
-        updatedAt: updatedTask!.updatedAt,
-      });
     } catch (error) {
       console.error(`[TASK] Error updating task:`, error);
       res.status(500).json({
@@ -427,8 +444,8 @@ router.delete(
         });
       }
 
-      // Check if user has access to the project
-      if (req.user!.projectName !== targetDbName) {
+      // Check if user has access to the project (allow "public" project for everyone)
+      if (req.user!.projectName !== targetDbName && targetDbName !== "public") {
         console.error(
           `[TASK] Access denied: User project ${
             req.user!.projectName
@@ -438,7 +455,7 @@ router.delete(
           error: "Access denied",
           suggestion: `You can only delete tasks in your own project '${
             req.user!.projectName
-          }'.`,
+          }' or the shared 'public' project.`,
         });
       }
 
@@ -520,8 +537,8 @@ router.post(
         });
       }
 
-      // Check if user has access to the project
-      if (req.user!.projectName !== targetDbName) {
+      // Check if user has access to the project (allow "public" project for everyone)
+      if (req.user!.projectName !== targetDbName && targetDbName !== "public") {
         console.error(
           `[TASK] Access denied: User project ${
             req.user!.projectName
@@ -531,23 +548,15 @@ router.post(
           error: "Access denied",
           suggestion: `You can only call tasks in your own project '${
             req.user!.projectName
-          }'.`,
+          }' or the shared 'public' project.`,
         });
       }
 
-      // Get the cloud task from the database (try project first, then global)
+      // Get the cloud task from the specific project requested
       const projectTasksCollection = getProjectTasksCollection(targetDbName);
-      let cloudTask = await projectTasksCollection.findOne({
+      const cloudTask = await projectTasksCollection.findOne({
         _id: taskName,
       });
-
-      // If not found in project, try global tasks
-      if (!cloudTask) {
-        const globalTasksCollection = getCloudTasksCollection();
-        cloudTask = await globalTasksCollection.findOne({
-          _id: taskName,
-        });
-      }
 
       if (!cloudTask) {
         console.log(`[TASK] Task not found: ${taskName}`);

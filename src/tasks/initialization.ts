@@ -1,10 +1,10 @@
-import { getCloudTasksCollection } from "../database/collections";
+import { getProjectTasksCollection } from "../database/collections";
 import { CloudTask } from "../types/tasks";
 
-// Initialize default cloud tasks (global basebase tasks)
+// Initialize default cloud tasks (public shared tasks)
 export async function initializeDefaultCloudTasks(): Promise<void> {
   console.log("Initializing default cloud tasks...");
-  const tasksCollection = getCloudTasksCollection();
+  const tasksCollection = getProjectTasksCollection("public");
 
   // Default tasks to initialize
   const defaultTasks: CloudTask[] = [];

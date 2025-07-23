@@ -13,7 +13,6 @@ import {
 import {
   getProjectTriggersCollection,
   getProjectTasksCollection,
-  getCloudTasksCollection,
 } from "../database/collections";
 import { validateTriggerConfig } from "../utils/trigger-validation";
 import { generateName } from "../utils/generators";
@@ -96,15 +95,15 @@ router.post(
         return res.status(400).json({ error: configValidation.error });
       }
 
-      // Check if task exists (support both global and project tasks)
+      // Check if task exists (support both public and project tasks)
       let taskExists;
       let actualTaskId = triggerData.taskId;
 
-      if (triggerData.taskId.startsWith("basebase/")) {
-        // Global task - check in cloud tasks collection
-        actualTaskId = triggerData.taskId.replace("basebase/", "");
-        const cloudTasksCollection = getCloudTasksCollection();
-        taskExists = await cloudTasksCollection.findOne({
+      if (triggerData.taskId.startsWith("public/")) {
+        // Public task - check in public project tasks collection
+        actualTaskId = triggerData.taskId.replace("public/", "");
+        const publicTasksCollection = getProjectTasksCollection("public");
+        taskExists = await publicTasksCollection.findOne({
           _id: actualTaskId,
         });
       } else {
@@ -177,7 +176,7 @@ router.post(
   }
 );
 
-// PUT /v1/projects/:projectId/triggers/:triggerId - Create or replace trigger with specific ID
+// PUT /v1/projects/:projectId/triggers/:triggerId - Create or update trigger with specific ID (upsert)
 router.put(
   "/v1/projects/:projectId/triggers/:triggerId",
   async (req: AuthenticatedRequest, res: Response) => {
@@ -217,15 +216,15 @@ router.put(
         return res.status(400).json({ error: configValidation.error });
       }
 
-      // Check if task exists (support both global and project tasks)
+      // Check if task exists (support both public and project tasks)
       let taskExists;
       let actualTaskId = triggerData.taskId;
 
-      if (triggerData.taskId.startsWith("basebase/")) {
-        // Global task - check in cloud tasks collection
-        actualTaskId = triggerData.taskId.replace("basebase/", "");
-        const cloudTasksCollection = getCloudTasksCollection();
-        taskExists = await cloudTasksCollection.findOne({
+      if (triggerData.taskId.startsWith("public/")) {
+        // Public task - check in public project tasks collection
+        actualTaskId = triggerData.taskId.replace("public/", "");
+        const publicTasksCollection = getProjectTasksCollection("public");
+        taskExists = await publicTasksCollection.findOne({
           _id: actualTaskId,
         });
       } else {
@@ -310,11 +309,11 @@ router.patch(
       if (updates.taskId) {
         let taskExists;
 
-        if (updates.taskId.startsWith("basebase/")) {
-          // Global task - check in cloud tasks collection
-          const actualTaskId = updates.taskId.replace("basebase/", "");
-          const cloudTasksCollection = getCloudTasksCollection();
-          taskExists = await cloudTasksCollection.findOne({
+        if (updates.taskId.startsWith("public/")) {
+          // Public task - check in public project tasks collection
+          const actualTaskId = updates.taskId.replace("public/", "");
+          const publicTasksCollection = getProjectTasksCollection("public");
+          taskExists = await publicTasksCollection.findOne({
             _id: actualTaskId,
           });
         } else {

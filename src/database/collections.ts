@@ -14,12 +14,6 @@ export function getDbAndCollection(
   return { db, collection };
 }
 
-// Helper function to get cloud tasks collection (global basebase tasks)
-export function getCloudTasksCollection(): Collection<CloudTask> {
-  const mongoClient = getMongoClient();
-  return mongoClient.db("basebase").collection<CloudTask>("tasks");
-}
-
 // Helper function to get project-specific cloud tasks collection
 export function getProjectTasksCollection(
   projectName: string

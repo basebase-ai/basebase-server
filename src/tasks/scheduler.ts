@@ -2,7 +2,6 @@ import { getMongoClient } from "../database/connection";
 import {
   getProjectTasksCollection,
   getProjectTriggersCollection,
-  getCloudTasksCollection,
 } from "../database/collections";
 import { CloudTask, TaskExecutionContext } from "../types/tasks";
 import { Trigger, CronTriggerConfig } from "../types/triggers";
@@ -154,15 +153,15 @@ export class SimpleScheduler {
     trigger: Trigger
   ): Promise<void> {
     try {
-      // Get the task to execute (support both global and project tasks)
+      // Get the task to execute (support both public and project tasks)
       let task;
       let actualTaskId = trigger.taskId;
 
-      if (trigger.taskId.startsWith("basebase/")) {
-        // Global task - check in cloud tasks collection
-        actualTaskId = trigger.taskId.replace("basebase/", "");
-        const cloudTasksCollection = getCloudTasksCollection();
-        task = await cloudTasksCollection.findOne({
+      if (trigger.taskId.startsWith("public/")) {
+        // Public task - check in public project tasks collection
+        actualTaskId = trigger.taskId.replace("public/", "");
+        const publicTasksCollection = getProjectTasksCollection("public");
+        task = await publicTasksCollection.findOne({
           _id: actualTaskId,
         });
       } else {

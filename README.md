@@ -349,6 +349,38 @@ The `:runQuery` endpoint returns an array of documents in Firebase format:
 
 BaseBase supports server-side Tasks that can be defined, invoked and run in the cloud via HTTP endpoints according to user-defined Triggers. Tasks are executed in a secure sandbox environment and can access external services like HTTP APIs and SMS providers.
 
+### Task Projects
+
+Tasks are organized by projects:
+
+- **Your Project**: Tasks in your own project (e.g., `my_project`) - only you can access these
+- **Public Project**: Shared tasks in the `public` project - anyone can access and execute these. Common utilities like `getPage` and `sendSms` are available here
+
+### Accessing Tasks
+
+**List tasks in your project:**
+
+```bash
+GET http://localhost:8000/v1/projects/my_project/tasks
+```
+
+**List public shared tasks:**
+
+```bash
+GET http://localhost:8000/v1/projects/public/tasks
+```
+
+**Execute a public task:**
+
+```bash
+POST http://localhost:8000/v1/projects/public/tasks/getPage:do
+{
+  "data": {
+    "url": "https://example.com"
+  }
+}
+```
+
 ### Invoking Tasks
 
 Tasks are executed using POST requests to the following endpoint pattern:
@@ -671,7 +703,7 @@ curl http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-**Create Task:**
+**Create Task (with specific ID):**
 
 ```bash
 curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/tasks \
@@ -686,7 +718,7 @@ curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/tasks \
   }'
 ```
 
-**Update Task:**
+**Create/Update Task (Upsert):**
 
 ```bash
 curl -X PUT http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME \
@@ -699,6 +731,8 @@ curl -X PUT http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME \
     "enabled": false
   }'
 ```
+
+> **Note:** PUT now works as an upsert operation - it will create the task if it doesn't exist, or update it if it does (similar to document PUT operations). For new tasks, `description` and `implementationCode` are required.
 
 **Delete Task:**
 
