@@ -34,7 +34,7 @@ export type TriggerConfig =
 
 export interface Trigger {
   _id: string;
-  functionId: string;
+  taskId: string;
   triggerType: TriggerType;
   config: TriggerConfig;
   enabled: boolean;
@@ -46,7 +46,7 @@ export interface Trigger {
 
 // API Request/Response types
 export interface CreateTriggerRequest {
-  functionId: string;
+  taskId: string;
   triggerType: TriggerType;
   config: TriggerConfig;
   enabled?: boolean;
@@ -54,7 +54,7 @@ export interface CreateTriggerRequest {
 }
 
 export interface UpdateTriggerRequest {
-  functionId?: string;
+  taskId?: string;
   triggerType?: TriggerType;
   config?: Partial<TriggerConfig>;
   enabled?: boolean;
@@ -63,7 +63,7 @@ export interface UpdateTriggerRequest {
 
 export interface TriggerResponse {
   _id: string;
-  functionId: string;
+  taskId: string;
   triggerType: TriggerType;
   config: TriggerConfig;
   enabled: boolean;
@@ -82,7 +82,7 @@ export interface ListTriggersResponse {
 export interface ScheduledJob {
   _id: string;
   projectId: string;
-  functionId: string;
+  taskId: string;
   triggerId: string; // New field linking to trigger
   cronExpression: string;
   nextRun: Date;

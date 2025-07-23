@@ -129,7 +129,7 @@ interface ConsoleAPI {
 interface ScheduledJob {
   _id: string;
   projectId: string;
-  functionId: string;
+  taskId: string;
   cronExpression: string;
   nextRun: Date;
   lastRun?: Date;

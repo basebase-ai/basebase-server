@@ -234,11 +234,11 @@ export class TestHelper {
         }
       }
 
-      // Re-initialize server functions since we dropped the basebase database
+      // Re-initialize cloud tasks since we dropped the basebase database
       const serverModule = require("../dist/src/server-modular.js");
-      if (typeof serverModule.initializeDefaultServerFunctions === "function") {
-        await serverModule.initializeDefaultServerFunctions();
-        console.log("Re-initialized server functions after cleanup");
+      if (typeof serverModule.initializeDefaultCloudTasks === "function") {
+        await serverModule.initializeDefaultCloudTasks();
+        console.log("Re-initialized cloud tasks after cleanup");
       }
     } catch (error) {
       console.error("Error cleaning up test data:", error);

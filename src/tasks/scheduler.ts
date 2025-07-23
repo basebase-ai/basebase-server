@@ -81,7 +81,7 @@ export class SimpleScheduler {
             const cronConfig = trigger.config as CronTriggerConfig;
             if (this.shouldRunTask(cronConfig.schedule, now)) {
               console.log(
-                `[SCHEDULER] Executing cron trigger: ${trigger._id} for task ${trigger.functionId} in project ${dbInfo.name}`
+                `[SCHEDULER] Executing cron trigger: ${trigger._id} for task ${trigger.taskId} in project ${dbInfo.name}`
               );
 
               // Execute task in background
@@ -90,7 +90,7 @@ export class SimpleScheduler {
                   await this.executeTriggeredTask(dbInfo.name, trigger);
                 } catch (error) {
                   console.error(
-                    `[SCHEDULER] Error executing triggered task ${trigger.functionId}:`,
+                    `[SCHEDULER] Error executing triggered task ${trigger.taskId}:`,
                     error
                   );
                 }
@@ -145,12 +145,12 @@ export class SimpleScheduler {
       // Get the task to execute
       const projectTasksCollection = getProjectTasksCollection(projectName);
       const task = await projectTasksCollection.findOne({
-        _id: trigger.functionId,
+        _id: trigger.taskId,
       });
 
       if (!task) {
         console.error(
-          `[SCHEDULER] Task ${trigger.functionId} not found for trigger ${trigger._id}`
+          `[SCHEDULER] Task ${trigger.taskId} not found for trigger ${trigger._id}`
         );
         return;
       }
@@ -194,7 +194,7 @@ export class SimpleScheduler {
       );
     } catch (error) {
       console.error(
-        `[SCHEDULER] Failed to execute triggered task ${trigger.functionId} via trigger ${trigger._id}:`,
+        `[SCHEDULER] Failed to execute triggered task ${trigger.taskId} via trigger ${trigger._id}:`,
         error
       );
     }

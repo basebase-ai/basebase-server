@@ -72,8 +72,8 @@ router.post(
       const triggerData: CreateTriggerRequest = req.body;
 
       // Validate required fields
-      if (!triggerData.functionId) {
-        return res.status(400).json({ error: "functionId is required" });
+      if (!triggerData.taskId) {
+        return res.status(400).json({ error: "taskId is required" });
       }
 
       if (!triggerData.triggerType) {
@@ -93,14 +93,14 @@ router.post(
         return res.status(400).json({ error: configValidation.error });
       }
 
-      // Check if function exists
-      const functionsCollection = getProjectTasksCollection(projectId);
-      const functionExists = await functionsCollection.findOne({
-        _id: triggerData.functionId,
+      // Check if task exists
+      const tasksCollection = getProjectTasksCollection(projectId);
+      const taskExists = await tasksCollection.findOne({
+        _id: triggerData.taskId,
       });
 
-      if (!functionExists) {
-        return res.status(404).json({ error: "Function not found" });
+      if (!taskExists) {
+        return res.status(404).json({ error: "Task not found" });
       }
 
       // Create trigger
@@ -108,7 +108,7 @@ router.post(
       const now = new Date();
       const trigger: Trigger = {
         _id: new ObjectId().toString(),
-        functionId: triggerData.functionId,
+        taskId: triggerData.taskId,
         triggerType: triggerData.triggerType,
         config: triggerData.config,
         enabled: triggerData.enabled ?? true,
@@ -157,15 +157,15 @@ router.put(
         }
       }
 
-      // Check if function exists if being updated
-      if (updates.functionId) {
-        const functionsCollection = getProjectTasksCollection(projectId);
-        const functionExists = await functionsCollection.findOne({
-          _id: updates.functionId,
+      // Check if task exists if being updated
+      if (updates.taskId) {
+        const tasksCollection = getProjectTasksCollection(projectId);
+        const taskExists = await tasksCollection.findOne({
+          _id: updates.taskId,
         });
 
-        if (!functionExists) {
-          return res.status(404).json({ error: "Function not found" });
+        if (!taskExists) {
+          return res.status(404).json({ error: "Task not found" });
         }
       }
 
@@ -226,7 +226,7 @@ router.delete(
 function triggerToResponse(trigger: Trigger): TriggerResponse {
   return {
     _id: trigger._id,
-    functionId: trigger.functionId,
+    taskId: trigger.taskId,
     triggerType: trigger.triggerType,
     config: trigger.config,
     enabled: trigger.enabled,

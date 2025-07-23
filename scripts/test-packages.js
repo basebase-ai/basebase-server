@@ -87,10 +87,10 @@ async function createTestFunction(
   serverUrl,
   jwtToken,
   projectId,
-  functionId,
+  taskId,
   functionData
 ) {
-  console.log(`\n📝 Creating function: ${functionId}`);
+  console.log(`\n📝 Creating function: ${taskId}`);
 
   const response = await makeRequest(
     `${serverUrl}/v1/projects/${projectId}/functions`,
@@ -100,13 +100,10 @@ async function createTestFunction(
   );
 
   if (response.statusCode === 201) {
-    console.log(`✅ Function ${functionId} created successfully`);
+    console.log(`✅ Function ${taskId} created successfully`);
     return true;
   } else {
-    console.log(
-      `❌ Failed to create function ${functionId}:`,
-      response.data.error
-    );
+    console.log(`❌ Failed to create function ${taskId}:`, response.data.error);
     return false;
   }
 }
