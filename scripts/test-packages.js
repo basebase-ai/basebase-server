@@ -121,7 +121,7 @@ async function callFunction(
   console.log(`\n🚀 Calling function: ${functionName}`);
 
   const response = await makeRequest(
-    `${serverUrl}/v1/projects/${projectId}/functions/${functionName}:call`,
+    `${serverUrl}/v1/projects/${projectId}/tasks/${functionName}:do`,
     "POST",
     JSON.stringify({ data }),
     { Authorization: `Bearer ${jwtToken}` }

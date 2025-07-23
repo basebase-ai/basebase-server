@@ -351,10 +351,10 @@ BaseBase supports server-side Tasks that can be defined, invoked and run in the 
 
 ### Invoking Tasks
 
-Tasks are called using POST requests to the following endpoint pattern:
+Tasks are executed using POST requests to the following endpoint pattern:
 
 ```
-POST http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME:call
+POST http://localhost:8000/v1/projects/PROJECT_ID/tasks/TASK_NAME:do
 Authorization: Bearer JWT_TOKEN
 Content-Type: application/json
 ```
@@ -396,7 +396,7 @@ Retrieves the contents of a webpage using HTTP GET.
 **Example:**
 
 ```bash
-curl -X POST http://localhost:8000/v1/projects/my-project/tasks/getPage:call \
+curl -X POST http://localhost:8000/v1/projects/my-project/tasks/getPage:do \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -449,7 +449,7 @@ Configure these environment variables in your `.env` file:
 **Example:**
 
 ```bash
-curl -X POST http://localhost:8000/v1/projects/my-project/tasks/sendSms:call \
+curl -X POST http://localhost:8000/v1/projects/my-project/tasks/sendSms:do \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -524,7 +524,7 @@ async (
 "requiredServices": ["axios", "moment", "lodash", "rss-parser"]
 
 // Use in function code
-const pageResult = await context.functions.call('getPage', { url: rssUrl });
+const pageResult = await context.tasks.do('getPage', { url: rssUrl });
 const feed = await rssParser.parseString(pageResult.data);
 const latest = lodash.take(lodash.orderBy(feed.items, 'pubDate', 'desc'), 5);
 ```
@@ -537,7 +537,7 @@ npm run test-packages
 
 ### User-Defined Tasks
 
-In addition to built-in tasks, you can create custom tasks that run on the BaseBase server. User tasks have access to the database, can call other tasks, and support scheduled execution.
+In addition to built-in tasks, you can create custom tasks that run on the BaseBase server. User tasks have access to the database, can execute other tasks, and support scheduled execution.
 
 #### Creating User Tasks
 
@@ -574,7 +574,7 @@ async (params, context) => {
 
 - `context.console`: Logging (`console.log`, `console.error`, `console.warn`)
 - `context.data`: Database API (Firebase-style operations)
-- `context.tasks`: Task API (call other tasks)
+- `context.tasks`: Task API (execute other tasks)
 - `context.user`: User information (`userId`, `projectName`)
 - `context.project`: Project information (`name`)
 
@@ -618,24 +618,24 @@ const results = await data.collection("users").queryDocs({
 });
 ```
 
-#### Calling Other Functions
+#### Executing Other Tasks
 
 ```javascript
-// Call built-in function
-const webpage = await functions.call("getPage", {
+// Execute built-in task
+const webpage = await tasks.do("getPage", {
   url: "https://api.example.com/data",
 });
 
-// Call user function
-const result = await functions.call("myOtherFunction", { param1: "value1" });
+// Execute user task
+const result = await tasks.do("myOtherTask", { param1: "value1" });
 ```
 
-#### Scheduled Functions
+#### Scheduled Tasks
 
-Functions can be scheduled to run automatically using cron expressions:
+Tasks can be scheduled to run automatically using cron expressions:
 
 ```bash
-curl -X POST http://localhost:8000/v1/functions \
+curl -X POST http://localhost:8000/v1/projects/PROJECT_ID/tasks \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -731,7 +731,7 @@ async (params, context) => {
   for (const source of sources) {
     try {
       // Fetch RSS feed
-      const response = await functions.call("getPage", { url: source.rssUrl });
+      const response = await tasks.do("getPage", { url: source.rssUrl });
 
       if (response.success) {
         // Parse and store articles (simplified)
@@ -801,10 +801,10 @@ async (params, context) => {
 
 ### Security & Access Control
 
-- **Authentication Required**: All function operations require a valid JWT token
-- **Project Scoped**: Functions can only be called within the authenticated user's own project
-- **Timeout Protection**: Functions have a 30-second execution timeout
-- **Sandbox Environment**: Functions execute in a controlled environment with access only to approved services
+- **Authentication Required**: All task operations require a valid JWT token
+- **Project Scoped**: Tasks can only be executed within the authenticated user's own project
+- **Timeout Protection**: Tasks have a 30-second execution timeout
+- **Sandbox Environment**: Tasks execute in a controlled environment with access only to approved services
 
 ### Error Handling
 

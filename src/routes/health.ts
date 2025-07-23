@@ -94,7 +94,7 @@ export function create404Handler() {
       `  DELETE /v1/projects/[projectId]/tasks/[taskName] - Delete task`
     );
     console.log(
-      `  POST /v1/projects/[projectId]/tasks/[taskName]:call - Call cloud task`
+      `  POST /v1/projects/[projectId]/tasks/[taskName]:do - Execute cloud task`
     );
 
     res.status(404).json({
@@ -116,7 +116,7 @@ export function create404Handler() {
         auth: "POST /v1/requestCode, POST /v1/verifyCode",
         projects: "GET /v1/projects, POST /v1/projects",
         tasks:
-          "GET /v1/projects/:projectId/tasks, GET /v1/projects/:projectId/tasks/:taskName, POST /v1/projects/:projectId/tasks, PUT /v1/projects/:projectId/tasks/:taskName, DELETE /v1/projects/:projectId/tasks/:taskName, POST /v1/projects/:projectId/tasks/:taskName:call",
+          "GET /v1/projects/:projectId/tasks, GET /v1/projects/:projectId/tasks/:taskName, POST /v1/projects/:projectId/tasks, PUT /v1/projects/:projectId/tasks/:taskName, DELETE /v1/projects/:projectId/tasks/:taskName, POST /v1/projects/:projectId/tasks/:taskName:do",
       },
     });
   };

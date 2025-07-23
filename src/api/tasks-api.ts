@@ -11,7 +11,7 @@ export class ProjectTaskAPI implements TaskAPI {
     private context: TaskExecutionContext
   ) {}
 
-  async call(taskName: string, data?: Record<string, any>): Promise<any> {
+  async do(taskName: string, data?: Record<string, any>): Promise<any> {
     // First try to find in project tasks
     const projectTasksCollection = getProjectTasksCollection(this.projectName);
     let cloudTask = await projectTasksCollection.findOne({

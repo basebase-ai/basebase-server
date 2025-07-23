@@ -37,5 +37,5 @@ export interface TaskExecutionContext {
 }
 
 export interface TaskAPI {
-  call(taskName: string, data?: Record<string, any>): Promise<any>;
+  do(taskName: string, data?: Record<string, any>): Promise<any>;
 }

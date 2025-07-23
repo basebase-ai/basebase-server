@@ -134,7 +134,7 @@ async function main() {
     });
 
     const response = await makeRequest(
-      `${serverUrl}/v1/projects/${projectId}/functions/sendSms:call`,
+      `${serverUrl}/v1/projects/${projectId}/tasks/sendSms:do`,
       "POST",
       functionData,
       { Authorization: `Bearer ${jwtToken}` }

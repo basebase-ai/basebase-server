@@ -471,20 +471,20 @@ router.delete(
   }
 );
 
-// CALL CLOUD TASK - POST (Firebase pattern with :call)
+// EXECUTE CLOUD TASK - POST (Firebase pattern with :do)
 router.post(
-  /^\/v1\/projects\/([^\/]+)\/tasks\/([^\/]+):call$/,
+  /^\/v1\/projects\/([^\/]+)\/tasks\/([^\/]+):do$/,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       // Extract projectId and taskName from regex match
       const match = req.path.match(
-        /^\/v1\/projects\/([^\/]+)\/tasks\/([^\/]+):call$/
+        /^\/v1\/projects\/([^\/]+)\/tasks\/([^\/]+):do$/
       );
       if (!match) {
         return res.status(400).json({
           error: "Invalid route format",
           suggestion:
-            "Use format: /v1/projects/{projectId}/tasks/{taskName}:call",
+            "Use format: /v1/projects/{projectId}/tasks/{taskName}:do",
         });
       }
 
@@ -502,9 +502,7 @@ router.post(
 
       const { data } = req.body as TaskCallRequest;
 
-      console.log(
-        `[TASK] POST /v1/projects/${projectId}/tasks/${taskName}:call`
-      );
+      console.log(`[TASK] POST /v1/projects/${projectId}/tasks/${taskName}:do`);
       console.log(
         `[TASK] User: ${req.user!.userId}, Project: ${req.user!.projectName}`
       );
