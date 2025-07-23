@@ -2,6 +2,7 @@ import { getMongoClient } from "../database/connection";
 import {
   getProjectTasksCollection,
   getProjectTriggersCollection,
+  getCloudTasksCollection,
 } from "../database/collections";
 import { CloudTask, TaskExecutionContext } from "../types/tasks";
 import { Trigger, CronTriggerConfig } from "../types/triggers";
@@ -9,6 +10,7 @@ import { ProjectDataAPI } from "../api/data-api";
 import { ProjectTaskAPI } from "../api/tasks-api";
 import { FunctionConsoleAPI } from "../api/console-api";
 import { executeCloudTask } from "./execution";
+import { CronExpressionParser } from "cron-parser";
 
 // Simple cron expression parser for basic scheduling
 export class SimpleScheduler {
@@ -79,7 +81,9 @@ export class SimpleScheduler {
 
           for (const trigger of cronTriggers) {
             const cronConfig = trigger.config as CronTriggerConfig;
-            if (this.shouldRunTask(cronConfig.schedule, now)) {
+            if (
+              this.shouldRunTask(cronConfig.schedule, now, cronConfig.timezone)
+            ) {
               console.log(
                 `[SCHEDULER] Executing cron trigger: ${trigger._id} for task ${trigger.taskId} in project ${dbInfo.name}`
               );
@@ -109,32 +113,40 @@ export class SimpleScheduler {
     }
   }
 
-  private shouldRunTask(schedule: string, now: Date): boolean {
-    // Simple schedule parsing - support basic formats:
-    // "*/10 * * * *" = every 10 minutes
-    // "0 */1 * * *" = every hour
-    // "0 9 * * *" = daily at 9 AM
+  private shouldRunTask(
+    schedule: string,
+    now: Date,
+    timezone?: string
+  ): boolean {
+    try {
+      // Parse the cron expression with timezone support
+      const options: any = {
+        currentDate: now,
+      };
 
-    if (schedule === "*/10 * * * *") {
-      // Every 10 minutes
-      return now.getMinutes() % 10 === 0 && now.getSeconds() < 30;
-    }
+      if (timezone) {
+        options.tz = timezone;
+      }
 
-    if (schedule === "0 */1 * * *") {
-      // Every hour
-      return now.getMinutes() === 0 && now.getSeconds() < 30;
-    }
+      // Parse the cron expression
+      const interval = CronExpressionParser.parse(schedule, options);
 
-    if (schedule === "0 9 * * *") {
-      // Daily at 9 AM
-      return (
-        now.getHours() === 9 && now.getMinutes() === 0 && now.getSeconds() < 30
+      // Get the previous execution time
+      const prevTime = interval.prev();
+
+      // Check if the previous execution time was within the last minute
+      // This means the task should run now
+      const timeDiff = now.getTime() - prevTime.toDate().getTime();
+
+      // Run if the last execution time was within the last 60 seconds
+      return timeDiff >= 0 && timeDiff < 60000;
+    } catch (error) {
+      console.error(
+        `[SCHEDULER] Error parsing cron expression "${schedule}":`,
+        error
       );
+      return false;
     }
-
-    // Add more schedule patterns as needed
-    console.warn(`[SCHEDULER] Unsupported schedule format: ${schedule}`);
-    return false;
   }
 
   private async executeTriggeredTask(
@@ -142,11 +154,24 @@ export class SimpleScheduler {
     trigger: Trigger
   ): Promise<void> {
     try {
-      // Get the task to execute
-      const projectTasksCollection = getProjectTasksCollection(projectName);
-      const task = await projectTasksCollection.findOne({
-        _id: trigger.taskId,
-      });
+      // Get the task to execute (support both global and project tasks)
+      let task;
+      let actualTaskId = trigger.taskId;
+
+      if (trigger.taskId.startsWith("basebase/")) {
+        // Global task - check in cloud tasks collection
+        actualTaskId = trigger.taskId.replace("basebase/", "");
+        const cloudTasksCollection = getCloudTasksCollection();
+        task = await cloudTasksCollection.findOne({
+          _id: actualTaskId,
+        });
+      } else {
+        // Project task - check in project tasks collection
+        const projectTasksCollection = getProjectTasksCollection(projectName);
+        task = await projectTasksCollection.findOne({
+          _id: trigger.taskId,
+        });
+      }
 
       if (!task) {
         console.error(

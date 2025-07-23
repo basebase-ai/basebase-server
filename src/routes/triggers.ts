@@ -13,6 +13,7 @@ import {
 import {
   getProjectTriggersCollection,
   getProjectTasksCollection,
+  getCloudTasksCollection,
 } from "../database/collections";
 import { validateTriggerConfig } from "../utils/trigger-validation";
 
@@ -93,11 +94,24 @@ router.post(
         return res.status(400).json({ error: configValidation.error });
       }
 
-      // Check if task exists
-      const tasksCollection = getProjectTasksCollection(projectId);
-      const taskExists = await tasksCollection.findOne({
-        _id: triggerData.taskId,
-      });
+      // Check if task exists (support both global and project tasks)
+      let taskExists;
+      let actualTaskId = triggerData.taskId;
+
+      if (triggerData.taskId.startsWith("basebase/")) {
+        // Global task - check in cloud tasks collection
+        actualTaskId = triggerData.taskId.replace("basebase/", "");
+        const cloudTasksCollection = getCloudTasksCollection();
+        taskExists = await cloudTasksCollection.findOne({
+          _id: actualTaskId,
+        });
+      } else {
+        // Project task - check in project tasks collection
+        const tasksCollection = getProjectTasksCollection(projectId);
+        taskExists = await tasksCollection.findOne({
+          _id: triggerData.taskId,
+        });
+      }
 
       if (!taskExists) {
         return res.status(404).json({ error: "Task not found" });
@@ -160,10 +174,22 @@ router.put(
 
       // Check if task exists if being updated
       if (updates.taskId) {
-        const tasksCollection = getProjectTasksCollection(projectId);
-        const taskExists = await tasksCollection.findOne({
-          _id: updates.taskId,
-        });
+        let taskExists;
+
+        if (updates.taskId.startsWith("basebase/")) {
+          // Global task - check in cloud tasks collection
+          const actualTaskId = updates.taskId.replace("basebase/", "");
+          const cloudTasksCollection = getCloudTasksCollection();
+          taskExists = await cloudTasksCollection.findOne({
+            _id: actualTaskId,
+          });
+        } else {
+          // Project task - check in project tasks collection
+          const tasksCollection = getProjectTasksCollection(projectId);
+          taskExists = await tasksCollection.findOne({
+            _id: updates.taskId,
+          });
+        }
 
         if (!taskExists) {
           return res.status(404).json({ error: "Task not found" });

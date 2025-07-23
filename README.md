@@ -838,6 +838,8 @@ Content-Type: application/json
 **Required Fields:**
 
 - `taskId` (string): The ID of the task to execute
+  - For project tasks: `"my-task-id"`
+  - For global tasks: `"basebase/sendSms"` or `"basebase/getPage"`
 - `triggerType` (string): Type of trigger - `"cron"`, `"onCreate"`, `"onUpdate"`, `"onDelete"`, `"onWrite"`, or `"http"`
 - `config` (object): Configuration specific to the trigger type
 
@@ -873,11 +875,47 @@ Execute tasks on a schedule using cron expressions:
 
 **Common Schedule Examples:**
 
-- `"*/10 * * * * *"` - Every 10 seconds
-- `"0 */5 * * * *"` - Every 5 minutes
-- `"0 0 */2 * * *"` - Every 2 hours
-- `"0 0 9 * * 1"` - Every Monday at 9 AM
-- `"0 30 14 1 * *"` - 1st day of month at 2:30 PM
+BaseBase uses the [cron-parser](https://www.npmjs.com/package/cron-parser) library, supporting full cron expression syntax:
+
+- `"* * * * *"` - Every minute
+- `"*/5 * * * *"` - Every 5 minutes
+- `"0 */2 * * *"` - Every 2 hours
+- `"0 9 * * 1"` - Every Monday at 9 AM
+- `"30 14 1 * *"` - 1st day of month at 2:30 PM
+- `"0 0 * * 0"` - Every Sunday at midnight
+- `"15 10 * * 1-5"` - Weekdays at 10:15 AM
+
+**Cron Expression Format:**
+
+```
+*    *    *    *    *
+┬    ┬    ┬    ┬    ┬
+│    │    │    │    └─ day of week (0-7, 0 or 7 is Sun)
+│    │    │    └────── month (1-12, JAN-DEC)
+│    │    └─────────── day of month (1-31)
+│    └──────────────── hour (0-23)
+└───────────────────── minute (0-59)
+```
+
+**Using Global Tasks:**
+
+```json
+{
+  "taskId": "basebase/sendSms",
+  "triggerType": "cron",
+  "config": {
+    "schedule": "0 9 * * 1",
+    "timezone": "UTC"
+  },
+  "taskParams": {
+    "to": "+1234567890",
+    "message": "Weekly reminder: Check your tasks!",
+    "from": "BaseBase"
+  },
+  "enabled": true,
+  "description": "Weekly SMS reminder every Monday at 9 AM"
+}
+```
 
 #### 2. Database Triggers
 
