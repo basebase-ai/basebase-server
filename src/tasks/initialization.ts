@@ -52,7 +52,7 @@ export async function initializeDefaultCloudTasks(): Promise<void> {
   const sendSmsTask: CloudTask = {
     _id: "sendSms",
     description: "Send SMS message using Twilio",
-    implementationCode: `async (params, context) => {
+    implementationCode: `async (params, context, axios, twilio, getTwilioPhoneNumber) => {
       const { console, data, tasks } = context;
       const { to, message } = params;
       
@@ -62,15 +62,37 @@ export async function initializeDefaultCloudTasks(): Promise<void> {
       
       console.log(\`Sending SMS to: \${to}\`);
       
-      // This would use the Twilio service
-      // For now, we'll just simulate the response
+      // Check if Twilio is configured
+      if (!twilio) {
+        throw new Error("Twilio client not available. Check your TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN environment variables.");
+      }
+      
       try {
+        // Always use the configured Twilio phone number
+        const fromNumber = getTwilioPhoneNumber();
+        if (!fromNumber) {
+          throw new Error("TWILIO_PHONE_NUMBER environment variable not configured");
+        }
+        
+        console.log(\`Sending SMS from: \${fromNumber} to: \${to}\`);
+        
+        // Send the SMS using Twilio
+        const result = await twilio.messages.create({
+          body: message,
+          from: fromNumber,
+          to: to
+        });
+        
+        console.log(\`SMS sent successfully. SID: \${result.sid}\`);
+        
         return {
+          success: true,
           to: to,
+          from: fromNumber,
           message: message,
-          status: "sent",
-          timestamp: new Date().toISOString(),
-          messageId: "sim_" + Math.random().toString(36).substring(7)
+          status: result.status,
+          sid: result.sid,
+          timestamp: new Date().toISOString()
         };
       } catch (error) {
         console.error("Error sending SMS:", error);

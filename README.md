@@ -909,8 +909,7 @@ BaseBase uses the [cron-parser](https://www.npmjs.com/package/cron-parser) libra
   },
   "taskParams": {
     "to": "+1234567890",
-    "message": "Weekly reminder: Check your tasks!",
-    "from": "BaseBase"
+    "message": "Weekly reminder: Check your tasks!"
   },
   "enabled": true,
   "description": "Weekly SMS reminder every Monday at 9 AM"
