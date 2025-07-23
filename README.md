@@ -1,9 +1,10 @@
 # basebase-server
 
-The BaseBase Server exposes an API for rapid, scalable storage and retrieval of JSON documents.
+The BaseBase Server exposes an API for simple storage and retrieval of JSON documents, and the definition, execution and scheduling of cloud tasks.
 
-Documents are placed in Collections, and can be accessed via HTTP using structured paths and RESTful syntax.
-Each Collection is owned by a Project, which defines the read/write access rules for Documents in that Collection.
+Documents are placed in Collections, and can be accessed via HTTP using structured paths and RESTful syntax. Each Collection is owned by a Project, which defines the read/write access rules for Documents in that Collection.
+
+Tasks and Triggers are also owned by a Project.
 
 ## Authentication & Projects
 
@@ -346,7 +347,7 @@ The `:runQuery` endpoint returns an array of documents in Firebase format:
 
 ## Cloud Tasks
 
-BaseBase supports server-side cloud tasks that can be invoked via HTTP endpoints. Tasks are executed in a secure sandbox environment and can access external services like HTTP APIs and SMS providers.
+BaseBase supports server-side Tasks that can be defined, invoked and run in the cloud via HTTP endpoints according to user-defined Triggers. Tasks are executed in a secure sandbox environment and can access external services like HTTP APIs and SMS providers.
 
 ### Invoking Tasks
 
