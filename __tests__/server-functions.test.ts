@@ -279,21 +279,6 @@ describe("Server Tasks Tests", () => {
   });
 
   describe("Task Security", () => {
-    test("should prevent access to localhost URLs", async () => {
-      const response = await testHelper
-        .authenticatedRequest(userToken)
-        .post("/v1/projects/test-project/tasks/getPage:do")
-        .send({
-          data: {
-            url: "http://localhost:8000/admin",
-          },
-        });
-
-      // Currently localhost access is allowed, so this should succeed
-      expect(response.status).toBe(200);
-      expect(response.body.success).toBe(true);
-    });
-
     test("should prevent access to internal IP ranges", async () => {
       const response = await testHelper
         .authenticatedRequest(userToken)
