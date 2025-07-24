@@ -48,13 +48,42 @@ export async function executeCloudTask(
       async function () {}
     ).constructor;
 
-    // Firebase-style execution: Tasks must use module.exports pattern
+    // Create a secure require function that only allows whitelisted modules
+    const createSecureRequire = (availableServices: Record<string, any>) => {
+      return (moduleName: string): any => {
+        // Map of allowed modules to their implementations
+        const allowedModules: Record<string, any> = {
+          axios: availableServices.axios,
+          twilio: availableServices.twilio,
+          moment: availableServices.moment,
+          "moment-timezone": availableServices.momentTimezone,
+          puppeteer: availableServices.puppeteer,
+          "rss-parser": availableServices.rssParser,
+        };
+
+        if (allowedModules.hasOwnProperty(moduleName)) {
+          return allowedModules[moduleName];
+        }
+
+        // Throw an error for disallowed modules
+        throw new Error(
+          `Module '${moduleName}' is not available. Available modules: ${Object.keys(
+            allowedModules
+          ).join(", ")}`
+        );
+      };
+    };
+
+    // Firebase-style execution with secure require support
     const executionCode = `
       "use strict";
       
       // Create Node.js-like module environment (Firebase Functions pattern)
       const module = { exports: {} };
       const exports = module.exports;
+      
+      // Provide secure require function
+      const require = createSecureRequire;
       
       // Execute user code (should set module.exports)
       ${taskCode}
@@ -82,6 +111,7 @@ export async function executeCloudTask(
       "momentTimezone",
       "puppeteer",
       "rssParser",
+      "createSecureRequire",
       executionCode
     );
 
@@ -99,7 +129,8 @@ export async function executeCloudTask(
       services.moment,
       services.momentTimezone,
       services.puppeteer,
-      services.rssParser
+      services.rssParser,
+      createSecureRequire(services)
     );
 
     const result = await Promise.race([executionPromise, timeoutPromise]);

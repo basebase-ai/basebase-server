@@ -13,33 +13,33 @@ export async function initializeDefaultCloudTasks(): Promise<void> {
   const getPageTask: CloudTask = {
     _id: "getPage",
     description: "Fetch web page content using Puppeteer",
-    implementationCode: `async (params, context) => {
-      const { console, data, tasks } = context;
-      const { url } = params;
-      
-      if (!url) {
-        throw new Error("URL parameter is required");
-      }
-      
-      console.log(\`Fetching page: \${url}\`);
-      
-      // This is a simplified implementation
-      // In a real scenario, you would use Puppeteer or similar
-      try {
-        const response = await fetch(url);
-        const content = await response.text();
-        
-        return {
-          url: url,
-          content: content,
-          timestamp: new Date().toISOString(),
-          success: true
-        };
-      } catch (error) {
-        console.error("Error fetching page:", error);
-        throw new Error(\`Failed to fetch page: \${error.message}\`);
-      }
-    }`,
+    implementationCode: `const axios = require('axios');
+
+module.exports = async (params, context) => {
+  const { console, data, tasks } = context;
+  const { url } = params;
+  
+  if (!url) {
+    throw new Error("URL parameter is required");
+  }
+  
+  console.log(\`Fetching page: \${url}\`);
+  
+  try {
+    const response = await axios.get(url);
+    const content = response.data;
+    
+    return {
+      url: url,
+      content: content,
+      timestamp: new Date().toISOString(),
+      success: true
+    };
+  } catch (error) {
+    console.error("Error fetching page:", error);
+    throw new Error(\`Failed to fetch page: \${error.message}\`);
+  }
+};`,
     requiredServices: ["axios"],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -52,53 +52,55 @@ export async function initializeDefaultCloudTasks(): Promise<void> {
   const sendSmsTask: CloudTask = {
     _id: "sendSms",
     description: "Send SMS message using Twilio",
-    implementationCode: `async (params, context, axios, twilio, getTwilioPhoneNumber) => {
-      const { console, data, tasks } = context;
-      const { to, message } = params;
-      
-      if (!to || !message) {
-        throw new Error("Both 'to' and 'message' parameters are required");
-      }
-      
-      console.log(\`Sending SMS to: \${to}\`);
-      
-      // Check if Twilio is configured
-      if (!twilio) {
-        throw new Error("Twilio client not available. Check your TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN environment variables.");
-      }
-      
-      try {
-        // Always use the configured Twilio phone number
-        const fromNumber = getTwilioPhoneNumber();
-        if (!fromNumber) {
-          throw new Error("TWILIO_PHONE_NUMBER environment variable not configured");
-        }
-        
-        console.log(\`Sending SMS from: \${fromNumber} to: \${to}\`);
-        
-        // Send the SMS using Twilio
-        const result = await twilio.messages.create({
-          body: message,
-          from: fromNumber,
-          to: to
-        });
-        
-        console.log(\`SMS sent successfully. SID: \${result.sid}\`);
-        
-        return {
-          success: true,
-          to: to,
-          from: fromNumber,
-          message: message,
-          status: result.status,
-          sid: result.sid,
-          timestamp: new Date().toISOString()
-        };
-      } catch (error) {
-        console.error("Error sending SMS:", error);
-        throw new Error(\`Failed to send SMS: \${error.message}\`);
-      }
-    }`,
+    implementationCode: `const twilio = require('twilio');
+
+module.exports = async (params, context, axios, twilioClient, getTwilioPhoneNumber) => {
+  const { console, data, tasks } = context;
+  const { to, message } = params;
+  
+  if (!to || !message) {
+    throw new Error("Both 'to' and 'message' parameters are required");
+  }
+  
+  console.log(\`Sending SMS to: \${to}\`);
+  
+  // Check if Twilio is configured
+  if (!twilioClient) {
+    throw new Error("Twilio client not available. Check your TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN environment variables.");
+  }
+  
+  try {
+    // Always use the configured Twilio phone number
+    const fromNumber = getTwilioPhoneNumber();
+    if (!fromNumber) {
+      throw new Error("TWILIO_PHONE_NUMBER environment variable not configured");
+    }
+    
+    console.log(\`Sending SMS from: \${fromNumber} to: \${to}\`);
+    
+    // Send the SMS using Twilio
+    const result = await twilioClient.messages.create({
+      body: message,
+      from: fromNumber,
+      to: to
+    });
+    
+    console.log(\`SMS sent successfully. SID: \${result.sid}\`);
+    
+    return {
+      success: true,
+      to: to,
+      from: fromNumber,
+      message: message,
+      status: result.status,
+      sid: result.sid,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error("Error sending SMS:", error);
+    throw new Error(\`Failed to send SMS: \${error.message}\`);
+  }
+};`,
     requiredServices: ["twilio"],
     createdAt: new Date(),
     updatedAt: new Date(),

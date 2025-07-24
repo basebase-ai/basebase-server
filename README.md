@@ -1406,3 +1406,74 @@ The project includes several utility scripts in the `scripts/` folder:
 - `npm run create-project` - Create new projects
 - `npm run setup-project` - Setup test project for development
 - `npm run manage-security-rules` - Manage collection security rules
+
+# Cloud Task Dependency Management
+
+## Using `require()` in Cloud Tasks
+
+Our cloud task execution environment supports secure `require()` statements for a curated list of modules, similar to Firebase Cloud Functions. This allows you to use familiar Node.js patterns while maintaining security.
+
+### Supported Modules
+
+You can use `require()` to import the following modules in your task code:
+
+- `axios` - HTTP client for making API requests
+- `twilio` - Twilio SDK for SMS/voice services
+- `moment` - Date/time manipulation library
+- `moment-timezone` - Timezone support for moment
+- `puppeteer` - Headless browser automation
+- `rss-parser` - RSS feed parsing
+
+### Example Usage
+
+```javascript
+// At the top of your task
+const axios = require("axios");
+const moment = require("moment");
+
+module.exports = async (params, context) => {
+  const { console, data, tasks } = context;
+
+  // Use axios to make HTTP requests
+  const response = await axios.get("https://api.example.com/data");
+
+  // Use moment for date operations
+  const timestamp = moment().format("YYYY-MM-DD HH:mm:ss");
+
+  return {
+    data: response.data,
+    processedAt: timestamp,
+  };
+};
+```
+
+### Security Policy
+
+- **Whitelist Approach**: Only pre-approved modules are available via `require()`
+- **No Arbitrary Modules**: You cannot install or require arbitrary npm packages
+- **Controlled Environment**: This prevents security risks and ensures consistency
+
+### Error Handling
+
+If you try to require an unsupported module, you'll get an error like:
+
+```
+Module 'fs' is not available. Available modules: axios, twilio, moment, moment-timezone, puppeteer, rss-parser
+```
+
+### Firebase Compatibility
+
+This approach mirrors Firebase Cloud Functions' dependency management:
+
+- Firebase: Uses `package.json` + full Node.js environment
+- Our Platform: Uses controlled whitelist for security and simplicity
+
+### Adding New Modules
+
+To request support for additional modules, contact the development team. New modules must be:
+
+- Widely useful across different use cases
+- Security-reviewed and approved
+- Compatible with our execution environment
+
+---
