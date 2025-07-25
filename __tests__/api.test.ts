@@ -1148,4 +1148,138 @@ describe("API Integration Tests", () => {
       expect(response.body).toHaveLength(4); // All 4 test documents
     });
   });
+
+  describe("Timestamp Handling", () => {
+    const testProject = "test-project";
+    const testCollection = "timestamp-test";
+
+    test("should handle timestampValue fields correctly", async () => {
+      const documentData = {
+        fields: {
+          name: { stringValue: "John Doe" },
+          birthdate: { timestampValue: "1990-01-01T00:00:00.000Z" },
+          lastLogin: { timestampValue: "2024-12-20T15:30:00.000Z" },
+          metadata: {
+            arrayValue: {
+              values: [
+                { stringValue: "test" },
+                { timestampValue: "2024-01-01T12:00:00.000Z" },
+              ],
+            },
+          },
+        },
+      };
+
+      // Create document with timestamp fields
+      const createResponse = await testHelper
+        .authenticatedRequest(userToken)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}`
+        )
+        .send(documentData);
+
+      expect(createResponse.status).toBe(201);
+
+      // Verify the response includes timestampValue format for dates
+      expect(createResponse.body.fields.birthdate.timestampValue).toBe(
+        "1990-01-01T00:00:00.000Z"
+      );
+      expect(createResponse.body.fields.lastLogin.timestampValue).toBe(
+        "2024-12-20T15:30:00.000Z"
+      );
+      expect(
+        createResponse.body.fields.metadata.arrayValue.values[1].timestampValue
+      ).toBe("2024-01-01T12:00:00.000Z");
+
+      const documentId = createResponse.body.name;
+
+      // Retrieve the document and verify timestamps are returned in correct format
+      const getResponse = await testHelper
+        .authenticatedRequest(userToken)
+        .get(
+          `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/${documentId}`
+        );
+
+      expect(getResponse.status).toBe(200);
+      expect(getResponse.body.fields.birthdate.timestampValue).toBe(
+        "1990-01-01T00:00:00.000Z"
+      );
+      expect(getResponse.body.fields.lastLogin.timestampValue).toBe(
+        "2024-12-20T15:30:00.000Z"
+      );
+      expect(
+        getResponse.body.fields.metadata.arrayValue.values[1].timestampValue
+      ).toBe("2024-01-01T12:00:00.000Z");
+    });
+
+    test("should support timestamp queries", async () => {
+      // Create test documents with different timestamps
+      const docs = [
+        {
+          fields: {
+            name: { stringValue: "Doc1" },
+            createdAt: { timestampValue: "2024-01-01T00:00:00.000Z" },
+          },
+        },
+        {
+          fields: {
+            name: { stringValue: "Doc2" },
+            createdAt: { timestampValue: "2024-06-01T00:00:00.000Z" },
+          },
+        },
+        {
+          fields: {
+            name: { stringValue: "Doc3" },
+            createdAt: { timestampValue: "2024-12-01T00:00:00.000Z" },
+          },
+        },
+      ];
+
+      // Create the documents
+      for (let i = 0; i < docs.length; i++) {
+        await testHelper
+          .authenticatedRequest(userToken)
+          .put(
+            `/v1/projects/${testProject}/databases/(default)/documents/${testCollection}/timestamp_doc_${
+              i + 1
+            }`
+          )
+          .send(docs[i]);
+      }
+
+      // Query for documents created after June 1, 2024
+      const queryResponse = await testHelper
+        .authenticatedRequest(userToken)
+        .post(
+          `/v1/projects/${testProject}/databases/(default)/documents:runQuery`
+        )
+        .send({
+          structuredQuery: {
+            from: [{ collectionId: testCollection }],
+            where: {
+              fieldFilter: {
+                field: { fieldPath: "createdAt" },
+                op: "GREATER_THAN_OR_EQUAL",
+                value: { timestampValue: "2024-06-01T00:00:00.000Z" },
+              },
+            },
+            orderBy: [
+              {
+                field: { fieldPath: "createdAt" },
+                direction: "ASCENDING",
+              },
+            ],
+          },
+        });
+
+      expect(queryResponse.status).toBe(200);
+      expect(queryResponse.body.length).toBe(2); // Should return Doc2 and Doc3
+      expect(queryResponse.body[0].document.fields.name.stringValue).toBe(
+        "Doc2"
+      );
+      expect(queryResponse.body[1].document.fields.name.stringValue).toBe(
+        "Doc3"
+      );
+    });
+  });
 });

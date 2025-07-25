@@ -5,6 +5,12 @@ import puppeteer from "puppeteer";
 import RSSParser from "rss-parser";
 import { TaskExecutionContext } from "../types/tasks";
 import { getTwilioClient, getTwilioPhoneNumber } from "../services/twilio";
+import {
+  getPostmarkClient,
+  getPostmarkFromEmail,
+  getPostmarkFromName,
+} from "../services/postmark";
+import { createSDKFunctions } from "../api/data-api";
 
 // Helper function to execute cloud task code safely
 export async function executeCloudTask(
@@ -26,6 +32,9 @@ export async function executeCloudTask(
         case "twilio":
           services.twilio = getTwilioClient();
           break;
+        case "postmark":
+          services.postmark = getPostmarkClient();
+          break;
         case "moment":
           services.moment = moment;
           break;
@@ -43,6 +52,9 @@ export async function executeCloudTask(
       }
     }
 
+    // Create SDK functions for Firebase-style database access
+    const sdkFunctions = createSDKFunctions(context.project.name);
+
     // Create the task from the code string
     const AsyncFunction = Object.getPrototypeOf(
       async function () {}
@@ -55,6 +67,7 @@ export async function executeCloudTask(
         const allowedModules: Record<string, any> = {
           axios: availableServices.axios,
           twilio: availableServices.twilio,
+          postmark: availableServices.postmark,
           moment: availableServices.moment,
           "moment-timezone": availableServices.momentTimezone,
           puppeteer: availableServices.puppeteer,
@@ -74,7 +87,7 @@ export async function executeCloudTask(
       };
     };
 
-    // Firebase-style execution with secure require support
+    // Firebase-style execution with secure require support and SDK functions
     const executionCode = `
       "use strict";
       
@@ -93,13 +106,28 @@ export async function executeCloudTask(
         throw new Error('Task must export a handler function using module.exports\\n\\n' +
           'Example:\\n' +
           'module.exports = async (params, context) => {\\n' +
-          '  const { console, data, tasks } = context;\\n' +
+          '  const { console, data, tasks, db, doc, getDoc, collection, getDocs } = context;\\n' +
           '  return { success: true };\\n' +
           '};');
       }
       
-      return module.exports(params, context, axios, twilio, getTwilioPhoneNumber, moment, momentTimezone, puppeteer, rssParser);
+      return module.exports(params, context, axios, twilio, getTwilioPhoneNumber, postmark, getPostmarkFromEmail, getPostmarkFromName, moment, momentTimezone, puppeteer, rssParser);
     `;
+
+    // Enhanced context with SDK functions
+    const enhancedContext = {
+      ...context,
+      // SDK-style functions for familiar Firebase/Firestore patterns
+      db: sdkFunctions.db,
+      doc: sdkFunctions.doc,
+      collection: sdkFunctions.collection,
+      getDoc: sdkFunctions.getDoc,
+      getDocs: sdkFunctions.getDocs,
+      addDoc: sdkFunctions.addDoc,
+      setDoc: sdkFunctions.setDoc,
+      updateDoc: sdkFunctions.updateDoc,
+      deleteDoc: sdkFunctions.deleteDoc,
+    };
 
     const userTask = new AsyncFunction(
       "params",
@@ -107,6 +135,9 @@ export async function executeCloudTask(
       "axios",
       "twilio",
       "getTwilioPhoneNumber",
+      "postmark",
+      "getPostmarkFromEmail",
+      "getPostmarkFromName",
       "moment",
       "momentTimezone",
       "puppeteer",
@@ -122,10 +153,13 @@ export async function executeCloudTask(
 
     const executionPromise = userTask(
       params,
-      context,
+      enhancedContext,
       services.axios,
       services.twilio,
       getTwilioPhoneNumber,
+      services.postmark,
+      getPostmarkFromEmail,
+      getPostmarkFromName,
       services.moment,
       services.momentTimezone,
       services.puppeteer,

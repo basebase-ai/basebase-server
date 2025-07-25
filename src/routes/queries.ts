@@ -25,6 +25,8 @@ function convertFieldFilter(fieldFilter: any): any {
     mongoValue = value.booleanValue;
   } else if (value.nullValue !== undefined) {
     mongoValue = null;
+  } else if (value.timestampValue !== undefined) {
+    mongoValue = new Date(value.timestampValue);
   } else {
     mongoValue = value;
   }
@@ -51,6 +53,7 @@ function convertFieldFilter(fieldFilter: any): any {
           if (v.integerValue !== undefined) return parseInt(v.integerValue);
           if (v.doubleValue !== undefined) return parseFloat(v.doubleValue);
           if (v.booleanValue !== undefined) return v.booleanValue;
+          if (v.timestampValue !== undefined) return new Date(v.timestampValue);
           return v;
         });
         return { [fieldPath]: { $in: inValues } };
@@ -63,6 +66,7 @@ function convertFieldFilter(fieldFilter: any): any {
           if (v.integerValue !== undefined) return parseInt(v.integerValue);
           if (v.doubleValue !== undefined) return parseFloat(v.doubleValue);
           if (v.booleanValue !== undefined) return v.booleanValue;
+          if (v.timestampValue !== undefined) return new Date(v.timestampValue);
           return v;
         });
         return { [fieldPath]: { $nin: notInValues } };

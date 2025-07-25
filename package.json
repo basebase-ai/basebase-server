@@ -17,6 +17,7 @@
     "test:tasks": "npm run build && jest __tests__/user-functions.test.ts --runInBand --detectOpenHandles --forceExit",
     "test:naming": "npm run build && jest __tests__/collection-naming.test.ts --runInBand --detectOpenHandles --forceExit",
     "test-twilio": "node scripts/test-twilio.js",
+    "test-postmark": "node scripts/test-postmark.js",
     "test-packages": "node scripts/test-packages.js"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
     "moment": "^2.30.1",
     "moment-timezone": "^0.6.0",
     "mongodb": "^6.10.0",
+    "postmark": "^4.0.5",
     "puppeteer": "^24.14.0",
     "rss-parser": "^3.13.0",
     "twilio": "^5.3.4"

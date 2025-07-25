@@ -207,3 +207,185 @@ export class ProjectCollectionAPI implements CollectionAPI {
     return docs.map((doc) => convertToFirestoreFormat(doc));
   }
 }
+
+// Firebase-style SDK compatibility layer for cloud tasks
+export interface DocumentReference {
+  id: string;
+  path: string;
+  projectName: string;
+  collectionName: string;
+}
+
+export interface CollectionReference {
+  path: string;
+  projectName: string;
+  collectionName: string;
+}
+
+export interface DocumentSnapshot {
+  id: string;
+  exists: boolean;
+  data(): any | null;
+  ref: DocumentReference;
+}
+
+export interface QuerySnapshot {
+  docs: DocumentSnapshot[];
+  size: number;
+  empty: boolean;
+  forEach(callback: (doc: DocumentSnapshot) => void): void;
+}
+
+export interface DatabaseInstance {
+  projectName: string;
+}
+
+// SDK-style functions for cloud tasks
+export function createSDKFunctions(projectName: string) {
+  const db: DatabaseInstance = { projectName };
+
+  function doc(db: DatabaseInstance, path: string): DocumentReference {
+    const pathParts = path.split("/");
+    if (pathParts.length !== 2) {
+      throw new Error('Document path must be in format "collection/document"');
+    }
+
+    const [collectionName, documentId] = pathParts;
+    if (!isValidCollectionName(collectionName)) {
+      throw new Error("Invalid collection name");
+    }
+
+    return {
+      id: documentId,
+      path,
+      projectName: db.projectName,
+      collectionName,
+    };
+  }
+
+  function collection(db: DatabaseInstance, path: string): CollectionReference {
+    if (!isValidCollectionName(path)) {
+      throw new Error("Invalid collection name");
+    }
+
+    return {
+      path,
+      projectName: db.projectName,
+      collectionName: path,
+    };
+  }
+
+  async function getDoc(docRef: DocumentReference): Promise<DocumentSnapshot> {
+    const { collection } = getDbAndCollection(
+      docRef.projectName,
+      docRef.collectionName
+    );
+    const query = buildDocumentQuery(docRef.id);
+    const doc = await collection.findOne(query);
+
+    const docData = doc ? convertToFirestoreFormat(doc) : null;
+
+    return {
+      id: docRef.id,
+      exists: !!doc,
+      data: () => docData?.fields || null,
+      ref: docRef,
+    };
+  }
+
+  async function getDocs(
+    collectionRef: CollectionReference
+  ): Promise<QuerySnapshot> {
+    const { collection } = getDbAndCollection(
+      collectionRef.projectName,
+      collectionRef.collectionName
+    );
+
+    const docs = await collection.find({}).toArray();
+    const snapshots: DocumentSnapshot[] = docs.map((doc) => {
+      const docData = convertToFirestoreFormat(doc);
+      const docRef: DocumentReference = {
+        id: doc._id.toString(),
+        path: `${collectionRef.collectionName}/${doc._id}`,
+        projectName: collectionRef.projectName,
+        collectionName: collectionRef.collectionName,
+      };
+
+      return {
+        id: doc._id.toString(),
+        exists: true,
+        data: () => docData.fields || null,
+        ref: docRef,
+      };
+    });
+
+    return {
+      docs: snapshots,
+      size: snapshots.length,
+      empty: snapshots.length === 0,
+      forEach: (callback: (doc: DocumentSnapshot) => void) => {
+        snapshots.forEach(callback);
+      },
+    };
+  }
+
+  async function addDoc(
+    collectionRef: CollectionReference,
+    data: Record<string, any>
+  ): Promise<DocumentReference> {
+    const collectionAPI = new ProjectCollectionAPI(
+      collectionRef.projectName,
+      collectionRef.collectionName
+    );
+    const result = await collectionAPI.addDoc(data);
+
+    return {
+      id: result.id,
+      path: `${collectionRef.collectionName}/${result.id}`,
+      projectName: collectionRef.projectName,
+      collectionName: collectionRef.collectionName,
+    };
+  }
+
+  async function setDoc(
+    docRef: DocumentReference,
+    data: Record<string, any>
+  ): Promise<void> {
+    const collectionAPI = new ProjectCollectionAPI(
+      docRef.projectName,
+      docRef.collectionName
+    );
+    await collectionAPI.setDoc(docRef.id, data);
+  }
+
+  async function updateDoc(
+    docRef: DocumentReference,
+    data: Partial<Record<string, any>>
+  ): Promise<void> {
+    const collectionAPI = new ProjectCollectionAPI(
+      docRef.projectName,
+      docRef.collectionName
+    );
+    await collectionAPI.updateDoc(docRef.id, data);
+  }
+
+  async function deleteDoc(docRef: DocumentReference): Promise<void> {
+    const collectionAPI = new ProjectCollectionAPI(
+      docRef.projectName,
+      docRef.collectionName
+    );
+    await collectionAPI.deleteDoc(docRef.id);
+  }
+
+  return {
+    db,
+    doc,
+    collection,
+    getDoc,
+    getDocs,
+    addDoc,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+  };
+}

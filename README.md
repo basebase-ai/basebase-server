@@ -100,12 +100,18 @@ POST http://localhost:8000/v1/projects/PROJECT_ID/databases/(default)/documents/
 Body: {
   "fields": {
     "name": {"stringValue": "John Doe"},
-    "age": {"integerValue": "30"}
+    "age": {"integerValue": "30"},
+    "birthdate": {"timestampValue": "1990-01-01T00:00:00.000Z"},
+    "lastLogin": {"timestampValue": "2024-12-20T15:30:00.000Z"}
   }
 }
 ```
 
 ⚠️ **Note**: Collection names must be lowercase with underscores/hyphens only. Using `userProfiles` (camelCase) will return a 400 error.
+
+### Date Handling
+
+Dates should be sent using the `timestampValue` format with ISO 8601 strings. They will be stored as MongoDB `ISODate` objects and returned in the same `timestampValue` format.
 
 **Note:** POST creates documents with auto-generated `_id` IDs (72-bit base64 strings). To create or replace a document with a specific ID, use the PUT endpoint instead.
 
@@ -213,14 +219,15 @@ Content-Type: application/json
 
 ### Value Types
 
-| Type                  | Format                              | Example                       |
-| --------------------- | ----------------------------------- | ----------------------------- |
-| String                | `{"stringValue": "text"}`           | `{"stringValue": "John Doe"}` |
-| Integer               | `{"integerValue": "123"}`           | `{"integerValue": "30"}`      |
-| Double                | `{"doubleValue": "123.45"}`         | `{"doubleValue": "99.99"}`    |
-| Boolean               | `{"booleanValue": true}`            | `{"booleanValue": false}`     |
-| Null                  | `{"nullValue": null}`               | `{"nullValue": null}`         |
-| Array (for IN/NOT_IN) | `{"arrayValue": {"values": [...]}}` | See examples below            |
+| Type                  | Format                              | Example                                          |
+| --------------------- | ----------------------------------- | ------------------------------------------------ |
+| String                | `{"stringValue": "text"}`           | `{"stringValue": "John Doe"}`                    |
+| Integer               | `{"integerValue": "123"}`           | `{"integerValue": "30"}`                         |
+| Double                | `{"doubleValue": "123.45"}`         | `{"doubleValue": "99.99"}`                       |
+| Boolean               | `{"booleanValue": true}`            | `{"booleanValue": false}`                        |
+| Null                  | `{"nullValue": null}`               | `{"nullValue": null}`                            |
+| Timestamp             | `{"timestampValue": "ISO8601"}`     | `{"timestampValue": "2024-01-01T00:00:00.000Z"}` |
+| Array (for IN/NOT_IN) | `{"arrayValue": {"values": [...]}}` | See examples below                               |
 
 ### Query Examples
 
@@ -1393,6 +1400,7 @@ The API uses Firestore-compatible data format with "fields" wrapper and explicit
 - `doubleValue` for floating point numbers
 - `booleanValue` for booleans
 - `nullValue` for null values
+- `timestampValue` for dates (ISO 8601 format strings)
 
 ## Quick Start
 
@@ -1419,6 +1427,7 @@ You can use `require()` to import the following modules in your task code:
 
 - `axios` - HTTP client for making API requests
 - `twilio` - Twilio SDK for SMS/voice services
+- `postmark` - Postmark SDK for email services
 - `moment` - Date/time manipulation library
 - `moment-timezone` - Timezone support for moment
 - `puppeteer` - Headless browser automation
@@ -1447,6 +1456,56 @@ module.exports = async (params, context) => {
 };
 ```
 
+#### Email Example with Postmark
+
+```javascript
+const postmark = require("postmark");
+
+module.exports = async (
+  params,
+  context,
+  axios,
+  twilio,
+  getTwilioPhoneNumber,
+  postmarkClient,
+  getPostmarkFromEmail
+) => {
+  const { console, data, tasks } = context;
+  const { to, subject, htmlBody } = params;
+
+  if (!postmarkClient) {
+    throw new Error("Postmark not configured");
+  }
+
+  const fromEmail = getPostmarkFromEmail();
+  const result = await postmarkClient.sendEmail({
+    From: fromEmail,
+    To: to,
+    Subject: subject,
+    HtmlBody: htmlBody,
+  });
+
+  console.log(`Email sent with ID: ${result.MessageID}`);
+  return { success: true, messageId: result.MessageID };
+};
+```
+
+### Environment Variables
+
+The following environment variables need to be configured for the services:
+
+**Twilio (for SMS):**
+
+- `TWILIO_ACCOUNT_SID` - Your Twilio Account SID
+- `TWILIO_AUTH_TOKEN` - Your Twilio Auth Token
+- `TWILIO_PHONE_NUMBER` - Your Twilio phone number
+
+**Postmark (for Email):**
+
+- `POSTMARK_API_KEY` - Your Postmark Server API Key
+- `POSTMARK_FROM_EMAIL` - Default sender email address
+- `POSTMARK_FROM_NAME` - Optional sender name
+
 ### Security Policy
 
 - **Whitelist Approach**: Only pre-approved modules are available via `require()`
@@ -1458,7 +1517,7 @@ module.exports = async (params, context) => {
 If you try to require an unsupported module, you'll get an error like:
 
 ```
-Module 'fs' is not available. Available modules: axios, twilio, moment, moment-timezone, puppeteer, rss-parser
+Module 'fs' is not available. Available modules: axios, twilio, postmark, moment, moment-timezone, puppeteer, rss-parser
 ```
 
 ### Firebase Compatibility
