@@ -51,31 +51,64 @@ router.get(
         });
       }
 
-      // Get project-specific tasks (could be user's project or public project)
-      const projectTasksCollection = getProjectTasksCollection(targetDbName);
-      const projectTasks = await projectTasksCollection
+      // Get project-specific tasks and global tasks
+      const allTasks: any[] = [];
+
+      // First get project-specific tasks (if not already looking at public)
+      if (targetDbName !== "public") {
+        const projectTasksCollection = getProjectTasksCollection(targetDbName);
+        const projectTasks = await projectTasksCollection
+          .find({}, { projection: { implementationCode: 0 } })
+          .toArray();
+
+        const userTasks = projectTasks.map((task) => ({
+          id: task._id,
+          description: task.description,
+          requiredServices: task.requiredServices,
+          createdAt: task.createdAt,
+          updatedAt: task.updatedAt,
+          isUserTask: true, // These are user tasks
+          enabled: task.enabled !== false,
+          createdBy: task.createdBy,
+        }));
+
+        allTasks.push(...userTasks);
+        console.log(
+          `[TASK] Found ${projectTasks.length} user tasks in project ${targetDbName}`
+        );
+      }
+
+      // Always get global tasks from public database
+      const publicTasksCollection = getProjectTasksCollection("public");
+      const globalTasks = await publicTasksCollection
         .find({}, { projection: { implementationCode: 0 } })
         .toArray();
 
-      const allTasks = projectTasks.map((task) => ({
+      const publicTasks = globalTasks.map((task) => ({
         id: task._id,
         description: task.description,
         requiredServices: task.requiredServices,
         createdAt: task.createdAt,
         updatedAt: task.updatedAt,
-        isUserTask: targetDbName !== "public", // Public tasks are not user tasks
+        isUserTask: false, // Public tasks are not user tasks
         enabled: task.enabled !== false,
         createdBy: task.createdBy,
       }));
 
+      allTasks.push(...publicTasks);
       console.log(
-        `[TASK] Found ${projectTasks.length} tasks in project ${targetDbName}`
+        `[TASK] Found ${globalTasks.length} global tasks from public database`
       );
 
       res.json({
         tasks: allTasks,
         count: allTasks.length,
         projectName: targetDbName,
+        projectCount:
+          targetDbName !== "public"
+            ? allTasks.filter((t) => t.isUserTask).length
+            : 0,
+        globalCount: allTasks.filter((t) => !t.isUserTask).length,
       });
     } catch (error) {
       console.error(`[TASK] Error listing tasks:`, error);
@@ -126,13 +159,26 @@ router.get(
         });
       }
 
-      // Look for task in the specific project requested
-      const projectTasksCollection = getProjectTasksCollection(targetDbName);
-      const cloudTask = await projectTasksCollection.findOne({
-        _id: taskName,
-      });
+      // Look for task in the specific project requested, with fallback to global tasks
+      let cloudTask: any = null;
+      let isUserTask = true;
 
-      const isUserTask = targetDbName !== "public"; // Public tasks are not user tasks
+      // First try project-specific task
+      if (targetDbName !== "public") {
+        const projectTasksCollection = getProjectTasksCollection(targetDbName);
+        cloudTask = await projectTasksCollection.findOne({
+          _id: taskName,
+        });
+      }
+
+      // If not found, try global tasks from public database
+      if (!cloudTask) {
+        const publicTasksCollection = getProjectTasksCollection("public");
+        cloudTask = await publicTasksCollection.findOne({
+          _id: taskName,
+        });
+        isUserTask = false; // Global tasks are not user tasks
+      }
 
       if (!cloudTask) {
         console.log(`[TASK] Task not found: ${taskName}`);
@@ -142,7 +188,11 @@ router.get(
         });
       }
 
-      console.log(`[TASK] Retrieved task ${taskName}`);
+      console.log(
+        `[TASK] Retrieved task ${taskName} (${
+          isUserTask ? "project-specific" : "global"
+        })`
+      );
 
       res.json({
         id: cloudTask._id,
@@ -552,11 +602,26 @@ router.post(
         });
       }
 
-      // Get the cloud task from the specific project requested
-      const projectTasksCollection = getProjectTasksCollection(targetDbName);
-      const cloudTask = await projectTasksCollection.findOne({
-        _id: taskName,
-      });
+      // Get the cloud task from the specific project requested, with fallback to global tasks
+      let cloudTask: any = null;
+      let isGlobalTask = false;
+
+      // First try project-specific task
+      if (targetDbName !== "public") {
+        const projectTasksCollection = getProjectTasksCollection(targetDbName);
+        cloudTask = await projectTasksCollection.findOne({
+          _id: taskName,
+        });
+      }
+
+      // If not found, try global tasks from public database
+      if (!cloudTask) {
+        const publicTasksCollection = getProjectTasksCollection("public");
+        cloudTask = await publicTasksCollection.findOne({
+          _id: taskName,
+        });
+        isGlobalTask = true;
+      }
 
       if (!cloudTask) {
         console.log(`[TASK] Task not found: ${taskName}`);
@@ -565,6 +630,12 @@ router.post(
           suggestion: `The task '${taskName}' does not exist. Available tasks can be found by calling GET /v1/projects/{projectId}/tasks.`,
         });
       }
+
+      console.log(
+        `[TASK] Found task ${taskName} (${
+          isGlobalTask ? "global" : "project-specific"
+        })`
+      );
 
       // Prepare execution context
       const consoleAPI = new FunctionConsoleAPI();

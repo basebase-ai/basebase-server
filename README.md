@@ -37,7 +37,7 @@ POST http://localhost:8000/v1/verifyCode
 Body: {
   "phone": "+1234567890",
   "code": "123456",
-  "projectApiKey": "bb_your_project_api_key_here"
+  "projectId": "your_project_id_here"
 }
 ```
 
@@ -76,7 +76,7 @@ Include the JWT token in the Authorization header for all API requests:
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**Note:** You need a valid project API key to complete authentication. See the Project Management section below for creating projects.
+**Note:** You need a valid project ID to complete authentication. See the Project Management section below for creating projects.
 
 ### Project Name Rules
 

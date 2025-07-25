@@ -91,13 +91,13 @@ describe("Authentication and Project Flow", () => {
       expect(verificationCodeDoc).toBeDefined();
       const verificationCode = verificationCodeDoc!.code;
 
-      // Verify code with new project API key
+      // Verify code with new project ID
       const verifyCodeResponse = await request(testHelper.app)
         .post("/v1/verifyCode")
         .send({
           phone: testPhoneNumber,
           code: verificationCode,
-          projectApiKey: newProjectApiKey,
+          projectId: newProjectId,
         });
 
       console.log("Verify code response:", {
@@ -319,7 +319,7 @@ describe("Authentication and Project Flow", () => {
         .send({
           phone: testPhoneNumber,
           code: codeDoc!.code,
-          projectApiKey: project1Response.body.apiKey,
+          projectId: project1Id,
         });
 
       expect(project1Token.status).toBe(200);

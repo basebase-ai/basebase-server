@@ -83,7 +83,7 @@ describe("API Integration Tests", () => {
         .send({
           phone: "+15551234567",
           code: actualCode,
-          projectApiKey: testProjectApiKey,
+          projectId: "test-project-verify",
         });
 
       expect(response.status).toBe(200);

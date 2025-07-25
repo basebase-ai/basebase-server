@@ -278,6 +278,19 @@ async function verifyProjectApiKey(
   return project;
 }
 
+// Helper function to verify project by ID
+async function verifyProjectId(
+  mongoClient: MongoClient,
+  projectId: string
+): Promise<Project | null> {
+  const projectsCollection = mongoClient.db("basebase").collection("projects");
+
+  const project = (await projectsCollection.findOne({
+    _id: projectId,
+  } as any)) as unknown as Project | null;
+  return project;
+}
+
 // Helper function to send SMS via Twilio
 async function sendSMS(
   phone: string,
@@ -373,24 +386,24 @@ async function verifyCodeHandler(
   mongoClient: MongoClient
 ): Promise<void> {
   try {
-    const { phone, code, projectApiKey } = req.body;
+    const { phone, code, projectId } = req.body;
 
     console.log("=== VERIFY CODE DEBUG ===");
     console.log("Request body:", {
       phone,
       code: code ? "[REDACTED]" : undefined,
-      projectApiKey: projectApiKey ? "[REDACTED]" : undefined,
+      projectId: projectId ? "[REDACTED]" : undefined,
     });
 
-    if (!phone || !code || !projectApiKey) {
+    if (!phone || !code || !projectId) {
       console.log("Missing required fields:", {
         hasPhone: !!phone,
         hasCode: !!code,
-        hasProjectApiKey: !!projectApiKey,
+        hasProjectId: !!projectId,
       });
       res
         .status(400)
-        .json({ error: "Phone, code, and projectApiKey are required" });
+        .json({ error: "Phone, code, and projectId are required" });
       return;
     }
 
@@ -431,16 +444,16 @@ async function verifyCodeHandler(
       return;
     }
 
-    // Verify project API key
-    const project = await verifyProjectApiKey(mongoClient, projectApiKey);
+    // Verify project ID
+    const project = await verifyProjectId(mongoClient, projectId);
     console.log(
       "Project verification result:",
       project ? "found" : "not found"
     );
 
     if (!project) {
-      console.log("Invalid project API key");
-      res.status(400).json({ error: "Invalid project API key" });
+      console.log("Invalid project ID");
+      res.status(400).json({ error: "Invalid project ID" });
       return;
     }
 

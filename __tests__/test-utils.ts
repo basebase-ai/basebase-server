@@ -190,13 +190,13 @@ export class TestHelper {
       const actualCode = verificationCodeDoc.code;
       console.log("Using actual verification code:", actualCode);
 
-      // Step 2: Verify code and get JWT - needs phone, code, and projectApiKey
+      // Step 2: Verify code and get JWT - needs phone, code, and projectId
       const verifyResponse = await request(this.app)
         .post("/v1/verifyCode")
         .send({
           phone: this.testPhoneNumber,
           code: actualCode,
-          projectApiKey: testProjectApiKey,
+          projectId: "test-project",
         });
 
       if (verifyResponse.status !== 200) {

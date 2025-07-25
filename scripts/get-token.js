@@ -95,9 +95,9 @@ async function main() {
     );
     console.log("   Default test API key: test-api-key-123\n");
 
-    const projectApiKey = await prompt("Enter project API key: ");
-    if (!projectApiKey) {
-      console.error("❌ Project API key is required");
+    const projectId = await prompt("Enter project ID: ");
+    if (!projectId) {
+      console.error("❌ Project ID is required");
       process.exit(1);
     }
 
@@ -155,7 +155,7 @@ async function main() {
     const verifyCodeData = JSON.stringify({
       phone: phone,
       code: code,
-      projectApiKey: projectApiKey,
+      projectId: projectId,
     });
 
     const tokenResponse = await makeRequest(
