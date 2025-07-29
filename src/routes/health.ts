@@ -114,7 +114,7 @@ export function create404Handler() {
         metadata:
           "GET/PUT /v1/projects/:projectId/databases/(default)/documents/:collectionId/_security",
         auth: "POST /v1/requestCode, POST /v1/verifyCode",
-        projects: "GET /v1/projects, POST /v1/projects",
+        projects: "GET /projects",
         tasks:
           "GET /v1/projects/:projectId/tasks, GET /v1/projects/:projectId/tasks/:taskName, POST /v1/projects/:projectId/tasks, PUT /v1/projects/:projectId/tasks/:taskName, DELETE /v1/projects/:projectId/tasks/:taskName, POST /v1/projects/:projectId/tasks/:taskName:do",
       },

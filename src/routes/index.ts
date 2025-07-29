@@ -6,11 +6,15 @@ import tasksRoutes from "./tasks";
 import triggersRoutes from "./triggers";
 import queriesRoutes from "./queries";
 import healthRoutes, { create404Handler } from "./health";
+import projectsRoutes from "./projects";
 
 // Setup all routes with proper middleware
 export function setupRoutes(app: Express): void {
   // Health check routes (no auth required)
   app.use(healthRoutes);
+
+  // Projects routes (no auth required)
+  app.use(projectsRoutes);
 
   // Document CRUD routes (auth + connection required)
   app.use(checkConnection, authenticateToken, documentsRoutes);
