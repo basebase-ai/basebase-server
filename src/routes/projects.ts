@@ -4,10 +4,10 @@ import { convertToFirestoreFormat } from "../database/conversion";
 
 const router = Router();
 
-// GET /projects - List all projects (unauthenticated)
-router.get("/projects", async (req: Request, res: Response) => {
+// GET /v1/projects - List all projects (unauthenticated)
+router.get("/v1/projects", async (req: Request, res: Response) => {
   try {
-    console.log("[PROJECTS] GET /projects");
+    console.log("[PROJECTS] GET /v1/projects");
 
     // Get projects collection from basebase database
     const { collection } = getDbAndCollection("basebase", "projects");
