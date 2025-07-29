@@ -772,14 +772,14 @@ function setupAuthRoutes(
     }
   );
 
-  app.get(
-    "/v1/projects",
-    checkConnection,
-    authenticateToken,
-    async (req: AuthenticatedRequest, res: Response) => {
-      await listProjectsHandler(req, res, mongoClient);
-    }
-  );
+  // app.get(
+  //   "/v1/projects",
+  //   checkConnection,
+  //   authenticateToken,
+  //   async (req: AuthenticatedRequest, res: Response) => {
+  //     await listProjectsHandler(req, res, mongoClient);
+  //   }
+  // );
 
   app.post(
     "/v1/projects/:projectId/regenerate-key",
