@@ -14,6 +14,11 @@ import {
   convertToFirestoreFormat,
 } from "../database/conversion";
 import { generateName } from "../utils/generators";
+import {
+  requireOwnershipForUpdate,
+  requireOwnershipForDelete,
+} from "../middleware/security";
+import { ensureCollectionSecurity } from "../database/security-rules";
 
 const router = Router();
 
@@ -75,6 +80,9 @@ router.post(
         });
       }
 
+      // Ensure security rules are applied to the collection
+      await ensureCollectionSecurity(targetDbName, collectionId);
+
       const { collection } = getDbAndCollection(targetDbName, collectionId);
       const document = convertFromFirestoreFormat(req.body);
 
@@ -109,10 +117,11 @@ router.post(
       // Set the _id field to our custom ID
       document._id = documentId;
 
-      // Set timestamps
+      // Set owner and timestamps
       const now = new Date();
-      document.createdAt = now;
-      document.updatedAt = now;
+      document.ownerId = req.user!.userId; // Set the current user as owner
+      document.createTime = now;
+      document.updateTime = now;
 
       console.log(
         `[CREATE] Inserting document with _id: ${documentId} in ${targetDbName}/${collectionId}`
@@ -161,6 +170,9 @@ router.get(
       } catch (resolveError) {
         return res.status(404).json({ error: (resolveError as Error).message });
       }
+
+      // Ensure security rules are applied to the collection
+      await ensureCollectionSecurity(targetDbName, collectionId);
 
       const { db } = getDbAndCollection(targetDbName, collectionId);
       const collectionsCollection = db.collection("collections");
@@ -303,6 +315,9 @@ router.get(
         });
       }
 
+      // Ensure security rules are applied to the collection
+      await ensureCollectionSecurity(targetDbName, collectionId);
+
       const { collection } = getDbAndCollection(targetDbName, collectionId);
 
       // Build query to find document by _id or _id (for backward compatibility)
@@ -358,6 +373,9 @@ router.get(
         return res.status(404).json({ error: (resolveError as Error).message });
       }
 
+      // Ensure security rules are applied to the collection
+      await ensureCollectionSecurity(targetDbName, collectionId);
+
       const { collection } = getDbAndCollection(targetDbName, collectionId);
 
       const documents = await collection.find({}).toArray();
@@ -379,6 +397,7 @@ router.get(
 // UPDATE - PATCH document
 router.patch(
   "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
+  requireOwnershipForUpdate,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, collectionId, documentId } = req.params;
@@ -411,6 +430,9 @@ router.patch(
           suggestion: `Make sure the project '${projectId}' exists and you have access to it.`,
         });
       }
+
+      // Ensure security rules are applied to the collection
+      await ensureCollectionSecurity(targetDbName, collectionId);
 
       const { collection } = getDbAndCollection(targetDbName, collectionId);
 
@@ -548,6 +570,9 @@ router.put(
         });
       }
 
+      // Ensure security rules are applied to the collection
+      await ensureCollectionSecurity(targetDbName, collectionId);
+
       const { collection } = getDbAndCollection(targetDbName, collectionId);
       const document = convertFromFirestoreFormat(req.body);
 
@@ -557,18 +582,49 @@ router.put(
 
       const now = new Date();
       if (existingDoc) {
-        // Update existing document (preserve createTime and existing _id)
-        document._id = existingDoc._id; // Preserve the existing _id field exactly as it is
-        document.createTime = existingDoc.createTime || now;
+        // Check ownership for updates
+        const documentOwnerId = existingDoc.ownerId;
+        if (documentOwnerId && documentOwnerId !== req.user!.userId) {
+          return res.status(403).json({
+            error: "Access denied",
+            suggestion: "You can only modify documents that you own.",
+            details: {
+              operation: "update",
+              documentId,
+              requiredOwner: documentOwnerId,
+              currentUser: req.user!.userId,
+            },
+          });
+        }
+
+        // Update existing document - MERGE fields instead of replacing
+        // Remove immutable fields
+        delete document._id;
+        delete document.createTime;
+        delete document.ownerId; // Don't allow ownership changes
+
+        // Set update timestamp
         document.updateTime = now;
 
         console.log(
-          `[SET] Replacing existing document ${documentId} in ${targetDbName}/${collectionId}`
+          `[SET] Merging fields into existing document ${documentId} in ${targetDbName}/${collectionId}`
         );
-        await collection.replaceOne(query, document);
+        await collection.updateOne(query, { $set: document });
+
+        // Get the updated document for response
+        const updatedDoc = await collection.findOne(query);
+        if (!updatedDoc) {
+          return res.status(500).json({
+            error: "Document update failed",
+            suggestion:
+              "The document may have been deleted during the update. Please try again.",
+          });
+        }
+        res.json(convertToFirestoreFormat(updatedDoc));
       } else {
         // Create new document
         document._id = documentId; // Only set _id for new documents
+        document.ownerId = req.user!.userId; // Set owner for new documents
         document.createTime = now;
         document.updateTime = now;
 
@@ -576,13 +632,12 @@ router.put(
           `[SET] Creating new document ${documentId} in ${targetDbName}/${collectionId}`
         );
         await collection.insertOne(document);
+        res.json(convertToFirestoreFormat(document));
       }
 
       console.log(
         `[SET] Successfully set document ${documentId} in ${targetDbName}/${collectionId}`
       );
-
-      res.json(convertToFirestoreFormat(document));
     } catch (error) {
       console.error(`[SET] Error setting document:`, error);
       res.status(500).json({
@@ -597,6 +652,7 @@ router.put(
 // DELETE - DELETE document
 router.delete(
   "/v1/projects/:projectId/databases/\\(default\\)/documents/:collectionId/:documentId",
+  requireOwnershipForDelete,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { projectId, collectionId, documentId } = req.params;
@@ -628,6 +684,9 @@ router.delete(
           suggestion: `Make sure the project '${projectId}' exists and you have access to it.`,
         });
       }
+
+      // Ensure security rules are applied to the collection
+      await ensureCollectionSecurity(targetDbName, collectionId);
 
       const { collection } = getDbAndCollection(targetDbName, collectionId);
 

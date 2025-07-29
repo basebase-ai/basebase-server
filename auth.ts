@@ -3,6 +3,7 @@ import crypto from "crypto";
 import twilio from "twilio";
 import { Express, Request, Response, NextFunction } from "express";
 import { MongoClient, ObjectId } from "mongodb";
+import { initializeProjectSecurity } from "./src/database/security-rules";
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -600,6 +601,18 @@ async function createProjectHandler(
     const project = (await projectsCollection.findOne({
       _id: newProject._id,
     } as any)) as unknown as Project;
+
+    // Initialize default security rules for the new project
+    try {
+      await initializeProjectSecurity(project._id);
+      console.log(`Initialized security rules for project: ${project._id}`);
+    } catch (securityError) {
+      console.error(
+        `Failed to initialize security rules for project ${project._id}:`,
+        securityError
+      );
+      // Don't fail project creation if security rules fail - can be set up later
+    }
 
     res.status(201).json({
       project: {
