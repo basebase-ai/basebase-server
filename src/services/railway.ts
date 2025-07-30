@@ -35,7 +35,7 @@ export interface RailwayDomain {
   id: string;
   domain: string;
   serviceId: string;
-  projectId: string;
+  projectId?: string;
   environmentId: string;
 }
 
@@ -204,10 +204,10 @@ export class RailwayService {
     };
 
     const result = await this.makeGraphQLRequest<{
-      customDomainCreate: { domain: RailwayDomain };
+      customDomainCreate: RailwayDomain;
     }>(query, variables);
 
-    return result.customDomainCreate.domain;
+    return result.customDomainCreate;
   }
 
   /**
