@@ -4,7 +4,7 @@ This document describes the infrastructure creation system that automatically se
 
 ## Overview
 
-The infrastructure creation system is now split into focused endpoints for better debugging and testing:
+The infrastructure creation system is split into focused endpoints for better debugging and testing:
 
 ### **Individual Endpoints**
 
@@ -61,6 +61,8 @@ GITHUB_OWNER=basebase-ai
 
 Creates only the project document in the database.
 
+**Request Body:**
+
 ```json
 {
   "projectId": "my-app",
@@ -70,15 +72,49 @@ Creates only the project document in the database.
 }
 ```
 
+**Response:**
+
+```json
+{
+  "success": true,
+  "project": {
+    "id": "my-app",
+    "name": "My App",
+    "description": "A cool new app",
+    "categories": ["web", "saas"],
+    "githubUrl": "https://github.com/basebase-ai/my-app",
+    "productionUrl": "https://my-app.basebase.ai/",
+    "apiKey": "bbs_abc123..."
+  }
+}
+```
+
 ### 2. Create GitHub Repository
 
 **`POST /v1/create-repo`**
 
 Forks the starter template and updates config. Requires project to exist in database. Uses GitHub token from environment variables.
 
+**Request Body:**
+
 ```json
 {
   "projectId": "my-app"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "repository": {
+    "name": "my-app",
+    "fullName": "basebase-ai/my-app",
+    "url": "https://github.com/basebase-ai/my-app",
+    "cloneUrl": "https://github.com/basebase-ai/my-app.git",
+    "defaultBranch": "master"
+  }
 }
 ```
 
@@ -88,9 +124,28 @@ Forks the starter template and updates config. Requires project to exist in data
 
 Creates Railway service, triggers deployment, and sets up custom domain. Requires project to exist in database.
 
+**Request Body:**
+
 ```json
 {
   "projectId": "my-app"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "service": {
+    "id": "service-id",
+    "name": "my-app",
+    "projectId": "73e34391-e6de-4970-8f25-afb3d56e1846",
+    "environmentId": "env-id",
+    "deploymentId": "deployment-id",
+    "domain": "my-app.basebase.ai",
+    "deploymentUrl": "https://my-app.basebase.ai/"
+  }
 }
 ```
 
@@ -109,18 +164,11 @@ npm run test-create-repo
 npm run test-create-service
 ```
 
-### Test Complete Flow
-
-```bash
-# Test full infrastructure creation
-npm run test-create-simple
-```
-
 ### Test Environment Setup
 
 ```bash
 # Validate environment variables and API connectivity
-npm run test-infrastructure
+npm run test-infrastructure-config
 ```
 
 ## Domain Configuration
@@ -142,6 +190,6 @@ Be aware of API rate limits:
 
 Monitor the infrastructure creation process through:
 
-- Application logs (`[INFRASTRUCTURE]` prefix)
+- Application logs (`[PROJECT]`, `[REPO]`, `[SERVICE]` prefixes)
 - Railway deployment logs
 - GitHub webhook events (if configured)

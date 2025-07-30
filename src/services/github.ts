@@ -165,81 +165,135 @@ export class GitHubService {
    * Update the config.ts file with project-specific values
    */
   private async updateConfigFile(input: UpdateConfigInput): Promise<void> {
-    // Get the current config.ts file
-    const configResponse = await this.octokit.rest.repos.getContent({
-      owner: this.config.owner,
-      repo: input.repoName,
-      path: "config.ts",
-    });
+    // Retry mechanism for file operations after fork
+    const maxRetries = 5;
+    const baseDelay = 1000; // 1 second
 
-    if (
-      Array.isArray(configResponse.data) ||
-      configResponse.data.type !== "file"
-    ) {
-      throw new Error("config.ts is not a file or not found");
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `[GitHub] Attempting to read config.ts (attempt ${attempt}/${maxRetries})`
+        );
+
+        // Get the current config.ts file
+        const configResponse = await this.octokit.rest.repos.getContent({
+          owner: this.config.owner,
+          repo: input.repoName,
+          path: "config.ts",
+        });
+
+        if (
+          Array.isArray(configResponse.data) ||
+          configResponse.data.type !== "file"
+        ) {
+          throw new Error("config.ts is not a file or not found");
+        }
+
+        // Generate the new config content
+        const newContent = this.generateConfigContent(input.projectConfig);
+
+        // Update the file
+        await this.octokit.rest.repos.createOrUpdateFileContents({
+          owner: this.config.owner,
+          repo: input.repoName,
+          path: "config.ts",
+          message: `Configure project: ${input.projectConfig.name}`,
+          content: Buffer.from(newContent).toString("base64"),
+          sha: configResponse.data.sha,
+          branch: "master", // Using master branch as default
+        });
+
+        console.log(
+          `[GitHub] Successfully updated config.ts for ${input.repoName}`
+        );
+        return; // Success, exit retry loop
+      } catch (error: any) {
+        const isLastAttempt = attempt === maxRetries;
+        const is404Error = error.status === 404;
+
+        if (is404Error && !isLastAttempt) {
+          const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(
+            `[GitHub] config.ts not found (404), retrying in ${delay}ms...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // If it's the last attempt or a different error, throw
+        throw error;
+      }
     }
-
-    // Generate the new config content
-    const newContent = this.generateConfigContent(input.projectConfig);
-
-    // Update the file
-    await this.octokit.rest.repos.createOrUpdateFileContents({
-      owner: this.config.owner,
-      repo: input.repoName,
-      path: "config.ts",
-      message: `Configure project: ${input.projectConfig.name}`,
-      content: Buffer.from(newContent).toString("base64"),
-      sha: configResponse.data.sha,
-      branch: "master", // Using master branch as default
-    });
-
-    console.log(
-      `[GitHub] Successfully updated config.ts for ${input.repoName}`
-    );
   }
 
   /**
    * Update the README.md file with project-specific information
    */
   private async updateReadmeFile(input: UpdateConfigInput): Promise<void> {
-    try {
-      // Get the current README.md file
-      const readmeResponse = await this.octokit.rest.repos.getContent({
-        owner: this.config.owner,
-        repo: input.repoName,
-        path: "README.md",
-      });
+    // Retry mechanism for file operations after fork
+    const maxRetries = 5;
+    const baseDelay = 1000; // 1 second
 
-      if (
-        Array.isArray(readmeResponse.data) ||
-        readmeResponse.data.type !== "file"
-      ) {
-        throw new Error("README.md is not a file or not found");
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(
+          `[GitHub] Attempting to read README.md (attempt ${attempt}/${maxRetries})`
+        );
+
+        // Get the current README.md file
+        const readmeResponse = await this.octokit.rest.repos.getContent({
+          owner: this.config.owner,
+          repo: input.repoName,
+          path: "README.md",
+        });
+
+        if (
+          Array.isArray(readmeResponse.data) ||
+          readmeResponse.data.type !== "file"
+        ) {
+          throw new Error("README.md is not a file or not found");
+        }
+
+        // Generate the new README content
+        const newContent = this.generateReadmeContent(input.projectConfig);
+
+        // Update the file
+        await this.octokit.rest.repos.createOrUpdateFileContents({
+          owner: this.config.owner,
+          repo: input.repoName,
+          path: "README.md",
+          message: `Update README for project: ${input.projectConfig.name}`,
+          content: Buffer.from(newContent).toString("base64"),
+          sha: readmeResponse.data.sha,
+          branch: "master", // Using master branch as default
+        });
+
+        console.log(
+          `[GitHub] Successfully updated README.md for ${input.repoName}`
+        );
+        return; // Success, exit retry loop
+      } catch (error: any) {
+        const isLastAttempt = attempt === maxRetries;
+        const is404Error = error.status === 404;
+
+        if (is404Error && !isLastAttempt) {
+          const delay = baseDelay * Math.pow(2, attempt - 1); // Exponential backoff
+          console.log(
+            `[GitHub] README.md not found (404), retrying in ${delay}ms...`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // If it's the last attempt or a different error, log but don't throw for README
+        console.error(`[GitHub] Error updating README:`, error);
+        if (isLastAttempt) {
+          console.log(
+            `[GitHub] README update failed after ${maxRetries} attempts, continuing...`
+          );
+        }
+        return; // Don't throw here - README update failure shouldn't fail the whole operation
       }
-
-      // Generate the new README content
-      const newContent = this.generateReadmeContent(input.projectConfig);
-
-      // Update the file
-      await this.octokit.rest.repos.createOrUpdateFileContents({
-        owner: this.config.owner,
-        repo: input.repoName,
-        path: "README.md",
-        message: `Update README for project: ${input.projectConfig.name}`,
-        content: Buffer.from(newContent).toString("base64"),
-        sha: readmeResponse.data.sha,
-        branch: "master", // Using master branch as default
-      });
-
-      console.log(
-        `[GitHub] Successfully updated README.md for ${input.repoName}`
-      );
-    } catch (error) {
-      console.error(`[GitHub] Error updating README:`, error);
-      // Don't throw here - README update failure shouldn't fail the whole operation
-      console.log(
-        `[GitHub] Continuing without README update for ${input.repoName}`
-      );
     }
   }
 
