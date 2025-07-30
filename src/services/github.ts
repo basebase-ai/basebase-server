@@ -16,6 +16,7 @@ export interface ForkRepositoryInput {
 export interface UpdateConfigInput {
   repoName: string;
   projectConfig: {
+    projectId: string;
     name: string;
     description: string;
     githubUrl: string;
@@ -246,6 +247,7 @@ export class GitHubService {
    * Generate the config.ts file content with project-specific values
    */
   private generateConfigContent(config: {
+    projectId: string;
     name: string;
     description: string;
     githubUrl: string;
@@ -254,6 +256,7 @@ export class GitHubService {
   }): string {
     return `// Auto-generated project configuration
 export const appConfig = {
+  projectId: ${JSON.stringify(config.projectId)},
   name: ${JSON.stringify(config.name)},
   description: ${JSON.stringify(config.description)},
   githubUrl: ${JSON.stringify(config.githubUrl)},

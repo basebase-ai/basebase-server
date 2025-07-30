@@ -168,6 +168,7 @@ router.post(
       await githubService.updateProjectConfig({
         repoName: projectId,
         projectConfig: {
+          projectId,
           name,
           description,
           githubUrl: `https://github.com/basebase-ai/${projectId}`,
