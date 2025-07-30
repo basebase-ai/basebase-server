@@ -35,6 +35,8 @@ export interface RailwayDomain {
   id: string;
   domain: string;
   serviceId: string;
+  projectId: string;
+  environmentId: string;
 }
 
 export class RailwayService {
@@ -188,6 +190,7 @@ export class RailwayService {
           serviceId
           projectId
           environmentId
+        }
       }
     `;
 
