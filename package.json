@@ -5,7 +5,8 @@
   "main": "dist/src/server-modular.js",
   "scripts": {
     "start": "node dist/src/server-modular.js",
-    "dev": "npx ts-node src/server-modular.ts",
+    "dev": "nodemon",
+    "dev:build": "nodemon --exec \"npm run build && node dist/src/server-modular.js\"",
     "build": "tsc",
     "test": "npm run build && jest --runInBand --detectOpenHandles --forceExit",
     "test:clean": "npm run build && jest --runInBand --detectOpenHandles --forceExit --silent",
@@ -18,9 +19,14 @@
     "test:naming": "npm run build && jest __tests__/collection-naming.test.ts --runInBand --detectOpenHandles --forceExit",
     "test-twilio": "node scripts/test-twilio.js",
     "test-postmark": "node scripts/test-postmark.js",
-    "test-packages": "node scripts/test-packages.js"
+    "test-packages": "node scripts/test-packages.js",
+    "test-infrastructure-config": "node scripts/test-infrastructure-config.js",
+    "test-create-project": "node scripts/test-create-project.js",
+    "test-create-repo": "node scripts/test-create-repo.js",
+    "test-create-service": "node scripts/test-create-service.js"
   },
   "dependencies": {
+    "@octokit/rest": "^22.0.0",
     "axios": "^1.10.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -49,6 +55,7 @@
     "jest": "^29.7.0",
     "mongodb-memory-server": "^10.1.2",
     "nock": "^14.0.6",
+    "nodemon": "^3.1.10",
     "supertest": "^7.0.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",

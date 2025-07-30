@@ -29,6 +29,10 @@ interface Project {
   apiKey: string;
   createdAt: Date;
   updatedAt: Date;
+  // New fields for infrastructure management
+  githubUrl?: string; // GitHub repository URL
+  productionUrl?: string; // Production deployment URL
+  categories?: string[]; // Project categories
 }
 
 interface VerificationCode {
