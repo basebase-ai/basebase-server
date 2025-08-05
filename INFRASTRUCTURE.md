@@ -113,7 +113,7 @@ Forks the starter template and updates config. Requires project to exist in data
     "fullName": "basebase-ai/my-app",
     "url": "https://github.com/basebase-ai/my-app",
     "cloneUrl": "https://github.com/basebase-ai/my-app.git",
-    "defaultBranch": "master"
+    "defaultBranch": "main"
   }
 }
 ```

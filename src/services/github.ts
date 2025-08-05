@@ -200,7 +200,7 @@ export class GitHubService {
           message: `Configure project: ${input.projectConfig.name}`,
           content: Buffer.from(newContent).toString("base64"),
           sha: configResponse.data.sha,
-          branch: "master", // Using master branch as default
+          branch: "main", // Using main branch as default
         });
 
         console.log(
@@ -265,7 +265,7 @@ export class GitHubService {
           message: `Update README for project: ${input.projectConfig.name}`,
           content: Buffer.from(newContent).toString("base64"),
           sha: readmeResponse.data.sha,
-          branch: "master", // Using master branch as default
+          branch: "main", // Using main branch as default
         });
 
         console.log(
